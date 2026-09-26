@@ -1,0 +1,4 @@
+playwright      # headless Chromium for frame-exact capture (then: python -m playwright install chromium)
+edge-tts        # narration + word-level timestamps
+imageio-ffmpeg  # bundled static ffmpeg binary, no system install needed
+pillow          # contact sheets / stills tooling

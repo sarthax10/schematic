@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Schematic runtime</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="viewport">
+    <div id="frame">
+      <div id="grid"></div>
+      <div id="vignette"></div>
+      <div id="scenes"></div>
+      <div id="progress"></div>
+      <div id="captions"><div class="cap"></div></div>
+    </div>
+  </div>
+  <div id="controls" hidden>
+    <button id="play" type="button">Play</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Seek" />
+    <span id="clock">0.0s</span>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
