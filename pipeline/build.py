@@ -48,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--preview", action="store_true", help="serve a live preview instead of rendering")
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--stills", help="comma-separated times to snapshot as PNGs instead of rendering")
+    ap.add_argument("--shots", action="store_true", help="snapshot every shot once it settles (a storyboard sheet)")
+    ap.add_argument("--lint", action="store_true", help="check every shot's on-screen layout and exit")
     args = ap.parse_args(argv)
 
     out_dir = args.out or ROOT / "out" / args.plan.stem
@@ -67,8 +69,15 @@ def main(argv: list[str] | None = None) -> int:
             pass
         return 0
 
-    if args.stills:
-        times = [float(x) for x in args.stills.split(",")]
+    if args.lint:
+        issues = asyncio.run(render.lint(out_dir, render.settle_times(tl)))
+        for i in issues:
+            print(f"  lint: {i}")
+        print(f"  {len(issues)} layout issue(s)")
+        return 1 if issues else 0
+
+    if args.stills or args.shots:
+        times = render.settle_times(tl) if args.shots else [float(x) for x in args.stills.split(",")]
         paths = asyncio.run(render.snapshot(out_dir, times, out_dir))
         print("\n".join(str(p) for p in paths))
         return 0

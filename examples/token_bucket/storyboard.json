@@ -1,0 +1,31 @@
+{
+  "scenes": [
+    {"id": "hook", "sentences": [0, 2], "purpose": "hook", "mood": "night", "transition": {"type": "cut"},
+     "setting": "a phone and a server on a dark floor", "visual": "requests fly from phone to server; a red 429 slams in; a guard appears in front of a door",
+     "shots": ["wide: packets stream phone→server", "push in on server as 429 appears", "pull back: guard steps in front of the door"]},
+    {"id": "shop", "sentences": [3, 4], "purpose": "analogy: set the scene", "mood": "day", "transition": {"type": "zoom-in", "actor": "door"},
+     "setting": "coffee shop counter with barista, ticket jar, cup", "visual": "barista waves; close-up on the jar of tickets; a customer walks up and takes a ticket",
+     "shots": ["wide shop", "close-up on the jar", "wide: customer walks in, ticket flies to them"]},
+    {"id": "refill", "sentences": [5, 6], "purpose": "analogy: refill + capacity", "mood": "day", "transition": {"type": "dissolve"},
+     "setting": "barista beside a big jar, a fast clock", "visual": "tickets arc into the jar one per second; jar fills to 6 (Full); an extra ticket bounces off and falls away",
+     "shots": ["wide: barista drops tickets as the clock spins", "close-up on the jar as it fills and overflows"]},
+    {"id": "rush", "sentences": [7, 9], "purpose": "analogy: burst then wait", "mood": "dusk", "transition": {"type": "pan", "dir": "right"},
+     "setting": "a queue of eight people receding toward the counter", "visual": "crowd rushes in; six tickets fly out and six people cheer; the last two slump; a new ticket drops into the empty jar",
+     "shots": ["wide: queue rushes in, tickets fly", "close on the sad pair at the back", "close on the jar: Empty → 1 ticket"]},
+    {"id": "reveal", "sentences": [10, 11], "purpose": "reveal: map analogy → tech", "mood": "night", "transition": {"type": "dissolve"},
+     "setting": "the jar carried into the dark tech world", "visual": "jar morphs into a bucket; tokens drop in; client and API nodes connect through it",
+     "shots": ["jar morphs into bucket, title appears", "tokens fall in, labelled", "wide: client → bucket → API with packets"], "carry": ["jar"]},
+    {"id": "reject", "sentences": [12, 13], "purpose": "mechanism", "mood": "night", "transition": {"type": "dissolve"},
+     "setting": "same client → bucket → API diagram", "visual": "a request spends a token and passes; the next finds the bucket empty; a red 429 flies back; Retry-After appears",
+     "shots": ["close: token spent, then empty bucket shakes", "wide: 429 returns to the client"], "carry": ["bucket", "client", "api"]},
+    {"id": "github", "sentences": [14, 15], "purpose": "real-world example", "mood": "day", "transition": {"type": "iris", "actor": "client"},
+     "setting": "a laptop, a big counter, real response headers", "visual": "counter counts up to 5,000 per hour; real x-ratelimit headers highlight line by line",
+     "shots": ["wide: laptop, headers, counter counting", "on the headers: remaining line lights up"]},
+    {"id": "knobs", "sentences": [16, 19], "purpose": "pro insight", "mood": "signal", "transition": {"type": "zoom-out"},
+     "setting": "two knobs: a bucket and a clock", "visual": "bucket fills in a burst (size = burst); clock spins (refill = average); a noisy client floods, only two get through, API stays green",
+     "shots": ["the two knobs appear", "noisy client blocked, API protected"]},
+    {"id": "recap", "sentences": [20, 20], "purpose": "recap", "mood": "night", "transition": {"type": "pan", "dir": "down"},
+     "setting": "small bucket above a three-line checklist", "visual": "three rules check in one by one",
+     "shots": ["checklist reveals line by line"]}
+  ]
+}

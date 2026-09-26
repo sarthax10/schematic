@@ -42,7 +42,7 @@ def _align(text: str, boundaries: list[dict]) -> list[dict]:
             display = text[s:nxt].strip()
         words.append({
             "text": display,
-            "norm": re.sub(r"[^a-z0-9 ]", "", b["text"].lower()),
+            "norm": " ".join(re.sub(r"[^a-z0-9]", " ", b["text"].lower()).split()),
             "start": round(b["offset"] / TICKS, 3),
             "end": round((b["offset"] + b["duration"]) / TICKS, 3),
         })

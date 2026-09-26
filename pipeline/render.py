@@ -58,7 +58,8 @@ async def _render_chunk(browser, url: str, frames: range, fps: int, seg: Path, p
     page.on("pageerror", lambda e: errors.append(str(e)))
     await page.goto(url)
     try:
-        await page.wait_for_function("window.__ready === true", timeout=30_000)
+        # Generous: a CPU-only machine building every scene can take a while.
+        await page.wait_for_function("window.__ready === true", timeout=180_000)
     except Exception:
         raise RuntimeError(f"runtime failed to load: {errors or 'timeout'}")
 
@@ -100,10 +101,10 @@ async def _render(job_dir: Path, out: Path, fps: int, duration: float, workers: 
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(args=["--force-color-profile=srgb", "--hide-scrollbars"])
-            tasks = [
-                asyncio.create_task(_render_chunk(browser, url, ch, fps, seg, progress, i))
-                for i, (ch, seg) in enumerate(zip(chunks, segs))
-            ]
+            tasks = []
+            for i, (ch, seg) in enumerate(zip(chunks, segs)):
+                tasks.append(asyncio.create_task(_render_chunk(browser, url, ch, fps, seg, progress, i)))
+                await asyncio.sleep(2.0)  # stagger page builds instead of loading all at once
             while not all(t.done() for t in tasks):
                 await asyncio.sleep(1.0)
                 done = sum(progress)
@@ -141,7 +142,7 @@ async def snapshot(job_dir: Path, times: list[float], out_dir: Path) -> list[Pat
             browser = await pw.chromium.launch()
             page = await browser.new_page(viewport={"width": WIDTH, "height": HEIGHT})
             await page.goto(url)
-            await page.wait_for_function("window.__ready === true", timeout=30_000)
+            await page.wait_for_function("window.__ready === true", timeout=180_000)
             for t in times:
                 await page.evaluate("t => window.seek(t)", t)
                 p = out_dir / f"still_{t:06.2f}.png"
@@ -151,3 +152,42 @@ async def snapshot(job_dir: Path, times: list[float], out_dir: Path) -> list[Pat
     finally:
         server.shutdown()
     return paths
+
+
+def settle_times(tl: dict) -> list[float]:
+    """One sample per shot: just after its last beat has landed (so the frame shows the shot's
+    fullest state), but before the next shot's camera move starts."""
+    times = []
+    for sc in tl["scenes"]:
+        # The moment a scene opens: something must already be on set when the transition lands.
+        times.append(round(sc["start"] + 0.7, 3))
+        shots = sc["shots"]
+        for i, sh in enumerate(shots):
+            end = shots[i + 1]["t"] if i + 1 < len(shots) else sc["duration"] - 0.4
+            inside = [b["t"] for b in sc["beats"] if sh["t"] <= b["t"] < end]
+            t = max(inside) + 0.9 if inside else sh["t"] + 1.2
+            times.append(round(sc["start"] + max(sh["t"] + 0.6, min(t, end - 0.1)), 3))
+    return times
+
+
+async def lint(job_dir: Path, times: list[float]) -> list[dict]:
+    """Runs the runtime's own layout checks (window.lint) at each time."""
+    server, port = serve(job_dir)
+    url = f"http://127.0.0.1:{port}/index.html?timeline=/job/timeline.json&mode=render"
+    issues: list[dict] = []
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch()
+            page = await browser.new_page(viewport={"width": WIDTH, "height": HEIGHT})
+            errors: list[str] = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            await page.goto(url)
+            await page.wait_for_function("window.__ready === true", timeout=180_000)
+            for t in times:
+                issues += await page.evaluate("t => window.lint(t)", t)
+            if errors:
+                issues.append({"kind": "runtime_error", "detail": errors[:3]})
+            await browser.close()
+    finally:
+        server.shutdown()
+    return issues

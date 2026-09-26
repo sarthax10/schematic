@@ -1,0 +1,30 @@
+{
+  "title": "Rate limiting, explained with a coffee shop",
+  "sections": [
+    {"part": "hook", "text": "Ever hit an API and got back a four twenty-nine: Too Many Requests? That's not a bug. Someone is guarding the door."},
+    {"part": "analogy", "text": "Picture a tiny coffee shop. On the counter sits a jar of tickets, and every customer has to take one before they can order. Once every second, the barista drops a fresh ticket into the jar. It only holds six, so when it's full, extra tickets simply fall away. Now a crowd rushes in. The first six grab tickets and get served right away. Everyone after that waits for the next ticket to drop."},
+    {"part": "reveal", "text": "That's a token bucket, the classic way servers do rate limiting. The jar is the bucket, the tickets are tokens, and each customer is a request."},
+    {"part": "mechanism", "text": "Each request spends one token. When a request arrives and the bucket is empty, the server answers four twenty-nine, and can tell the client when to try again."},
+    {"part": "example", "text": "You've seen this in the wild. GitHub's API gives a signed-in user five thousand requests an hour, and every response tells you how many are left."},
+    {"part": "insight", "text": "Here's the part pros tune. The bucket size decides how big a burst you allow. The refill rate decides your average. Set both, and one noisy client can't flood your API for everyone else."},
+    {"part": "recap", "text": "So: refill at a steady rate, spend one token per request, and say no politely when it's empty."}
+  ],
+  "analogy": {
+    "setting": "a small coffee shop with a ticket jar on the counter",
+    "mapping": [
+      {"everyday": "jar", "technical": "bucket"},
+      {"everyday": "ticket", "technical": "token"},
+      {"everyday": "customer", "technical": "request"},
+      {"everyday": "barista adding a ticket each second", "technical": "refill rate"},
+      {"everyday": "jar capacity of six", "technical": "bucket size / burst limit"}
+    ]
+  },
+  "real_example": "GitHub REST API primary rate limit for authenticated users (5,000 requests/hour) and its x-ratelimit-limit / x-ratelimit-remaining response headers.",
+  "claims": [
+    "HTTP status 429 means Too Many Requests.",
+    "A 429 response can include a Retry-After header telling the client when to retry.",
+    "GitHub's REST API allows 5,000 requests per hour for authenticated users.",
+    "GitHub API responses include x-ratelimit-limit and x-ratelimit-remaining headers.",
+    "In a token bucket, capacity bounds the burst size and the refill rate bounds the long-run average rate."
+  ]
+}

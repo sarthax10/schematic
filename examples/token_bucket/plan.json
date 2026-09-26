@@ -1,0 +1,1915 @@
+{
+ "title": "Rate limiting, explained with a coffee shop",
+ "scenes": [
+  {
+   "id": "hook",
+   "mood": "night",
+   "narration": "Ever hit an API and got back a four twenty-nine: Too Many Requests? That's not a bug. Someone is guarding the door.",
+   "actors": [
+    {
+     "id": "floor",
+     "type": "shape",
+     "shape": "ground",
+     "at": [
+      6,
+      9.85
+     ]
+    },
+    {
+     "id": "phone",
+     "type": "prop",
+     "prop": "phone",
+     "at": [
+      2.1,
+      8.05
+     ],
+     "size": 2.4
+    },
+    {
+     "id": "server",
+     "type": "prop",
+     "prop": "server",
+     "at": [
+      9.7,
+      8.05
+     ],
+     "size": 2.8
+    },
+    {
+     "id": "door",
+     "type": "prop",
+     "prop": "door",
+     "at": [
+      5.6,
+      8.45
+     ],
+     "size": 2.4
+    },
+    {
+     "id": "guard",
+     "type": "character",
+     "at": [
+      7.0,
+      8.2
+     ],
+     "size": 2.1,
+     "face": "left",
+     "look": {
+      "shirt": "slate",
+      "hair": "short",
+      "skin": 2
+     },
+     "allowOverlap": [
+      "door"
+     ]
+    },
+    {
+     "id": "code",
+     "type": "text",
+     "style": "display",
+     "text": "429",
+     "tone": "fail",
+     "at": [
+      6,
+      3.2
+     ],
+     "size": 5,
+     "screen": true
+    },
+    {
+     "id": "meaning",
+     "type": "text",
+     "style": "label",
+     "text": "Too Many Requests",
+     "at": [
+      6,
+      5.05
+     ],
+     "size": 8,
+     "screen": true
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       7.2
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "hit an API",
+       "do": "send",
+       "from": "phone",
+       "to": "server",
+       "item": "packet",
+       "count": 7,
+       "stagger": 0.11,
+       "dur": 0.7,
+       "arc": 1.3
+      },
+      {
+       "at": "hit an API",
+       "do": "pulse",
+       "actor": "phone"
+      }
+     ]
+    },
+    {
+     "at": "four twenty-nine",
+     "camera": {
+      "focus": [
+       9.6,
+       7.1
+      ],
+      "zoom": 1.5
+     },
+     "beats": [
+      {
+       "at": "four twenty-nine",
+       "do": "enter",
+       "actor": "code",
+       "style": "pop"
+      },
+      {
+       "at": "four twenty-nine",
+       "do": "shake",
+       "actor": "server"
+      },
+      {
+       "at": "four twenty-nine",
+       "do": "flash",
+       "tone": "fail"
+      },
+      {
+       "at": "Too Many",
+       "do": "enter",
+       "actor": "meaning",
+       "style": "words"
+      }
+     ]
+    },
+    {
+     "at": "not a bug",
+     "camera": {
+      "focus": [
+       6,
+       7.3
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "not a bug",
+       "do": "exit",
+       "actor": "meaning",
+       "style": "fade"
+      },
+      {
+       "at": "not a bug",
+       "do": "exit",
+       "actor": "code",
+       "style": "sink"
+      },
+      {
+       "at": "Someone",
+       "do": "enter",
+       "actor": "door",
+       "style": "rise"
+      },
+      {
+       "at": "guarding",
+       "do": "enter",
+       "actor": "guard",
+       "style": "drop"
+      },
+      {
+       "after": 0.45,
+       "do": "state",
+       "actor": "guard",
+       "state": {
+        "pose": "point",
+        "expression": "neutral"
+       }
+      },
+      {
+       "after": 0.1,
+       "do": "emit",
+       "actor": "guard",
+       "kind": "exclaim"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shop",
+   "mood": "day",
+   "transition": {
+    "type": "zoom-in",
+    "actor": "door"
+   },
+   "narration": "Picture a tiny coffee shop. On the counter sits a jar of tickets, and every customer has to take one before they can order.",
+   "actors": [
+    {
+     "id": "floor",
+     "type": "shape",
+     "shape": "ground",
+     "at": [
+      6,
+      9.4
+     ]
+    },
+    {
+     "id": "shelf",
+     "type": "prop",
+     "prop": "shelf",
+     "at": [
+      9.3,
+      4.7
+     ],
+     "size": 2.6
+    },
+    {
+     "id": "barista",
+     "type": "character",
+     "at": [
+      3.3,
+      7.3
+     ],
+     "size": 2.4,
+     "look": {
+      "shirt": "mint",
+      "hair": "bun",
+      "skin": 1
+     }
+    },
+    {
+     "id": "counter",
+     "type": "prop",
+     "prop": "counter",
+     "at": [
+      6,
+      9.9
+     ],
+     "size": 8.6,
+     "allowOverlap": [
+      "barista",
+      "jar",
+      "cup",
+      "customer"
+     ]
+    },
+    {
+     "id": "cup",
+     "type": "prop",
+     "prop": "cup",
+     "at": [
+      9.35,
+      7.95
+     ],
+     "size": 1.1
+    },
+    {
+     "id": "jar",
+     "type": "prop",
+     "prop": "jar",
+     "at": [
+      7.5,
+      7.52
+     ],
+     "size": 2.0,
+     "state": {
+      "count": 6
+     }
+    },
+    {
+     "id": "customer",
+     "type": "character",
+     "at": [
+      1.2,
+      10.3
+     ],
+     "size": 2.8,
+     "face": "right",
+     "look": {
+      "shirt": "coral",
+      "hair": "curly",
+      "skin": 3
+     },
+     "allowOverlap": [
+      "barista",
+      "counter"
+     ]
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       7.6
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "coffee shop",
+       "do": "state",
+       "actor": "barista",
+       "state": {
+        "pose": "wave"
+       }
+      },
+      {
+       "after": 1.3,
+       "do": "state",
+       "actor": "barista",
+       "state": {
+        "pose": "idle"
+       }
+      }
+     ]
+    },
+    {
+     "at": "jar of tickets",
+     "camera": {
+      "focus": "jar",
+      "zoom": 2.0
+     },
+     "beats": [
+      {
+       "at": "jar",
+       "do": "hop",
+       "actor": "jar"
+      },
+      {
+       "at": "tickets",
+       "do": "highlight",
+       "actor": "jar",
+       "tone": "signal",
+       "hold": 1.4
+      },
+      {
+       "at": "tickets",
+       "do": "emit",
+       "actor": "jar",
+       "kind": "sparkle"
+      }
+     ]
+    },
+    {
+     "at": "every customer",
+     "camera": {
+      "focus": [
+       5.6,
+       8.3
+      ],
+      "zoom": 1.02
+     },
+     "beats": [
+      {
+       "at": "every customer",
+       "do": "enter",
+       "actor": "customer",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.3,
+       "do": "move",
+       "actor": "customer",
+       "to": [
+        4.4,
+        10.3
+       ],
+       "walk": true,
+       "dur": 1.3
+      },
+      {
+       "at": "take one",
+       "do": "send",
+       "from": "jar",
+       "to": "customer",
+       "item": "ticket",
+       "dur": 0.8,
+       "arc": 1.6
+      },
+      {
+       "at": "take one",
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 5
+       }
+      },
+      {
+       "at": "they can order",
+       "do": "state",
+       "actor": "customer",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.1,
+       "do": "emit",
+       "actor": "customer",
+       "kind": "check"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "refill",
+   "mood": "day",
+   "transition": {
+    "type": "dissolve"
+   },
+   "narration": "Once every second, the barista drops a fresh ticket into the jar. It only holds six, so when it's full, extra tickets simply fall away.",
+   "actors": [
+    {
+     "id": "floor",
+     "type": "shape",
+     "shape": "ground",
+     "at": [
+      6,
+      9.9
+     ]
+    },
+    {
+     "id": "barista",
+     "type": "character",
+     "at": [
+      2.5,
+      7.8
+     ],
+     "size": 2.8,
+     "look": {
+      "shirt": "mint",
+      "hair": "bun",
+      "skin": 1
+     }
+    },
+    {
+     "id": "jar",
+     "type": "prop",
+     "prop": "jar",
+     "at": [
+      7.2,
+      7.95
+     ],
+     "size": 3.4,
+     "state": {
+      "count": 3
+     }
+    },
+    {
+     "id": "clock",
+     "type": "prop",
+     "prop": "clock",
+     "at": [
+      10.2,
+      5.6
+     ],
+     "size": 1.8,
+     "state": {
+      "fast": true
+     }
+    },
+    {
+     "id": "rate",
+     "type": "text",
+     "style": "title",
+     "text": "+1 ticket every second",
+     "at": [
+      6,
+      2.9
+     ],
+     "size": 10,
+     "screen": true
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6.2,
+       7.3
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "every second",
+       "do": "enter",
+       "actor": "clock",
+       "style": "pop"
+      },
+      {
+       "at": "every second",
+       "do": "enter",
+       "actor": "rate",
+       "style": "words"
+      },
+      {
+       "at": "drops",
+       "do": "state",
+       "actor": "barista",
+       "state": {
+        "pose": "reach"
+       }
+      },
+      {
+       "at": "drops",
+       "do": "send",
+       "from": "barista",
+       "to": "jar",
+       "item": "ticket",
+       "dur": 0.7,
+       "arc": 1.4
+      },
+      {
+       "after": 0.7,
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 4
+       }
+      },
+      {
+       "after": 0.3,
+       "do": "send",
+       "from": "barista",
+       "to": "jar",
+       "item": "ticket",
+       "dur": 0.7,
+       "arc": 1.4
+      },
+      {
+       "after": 0.7,
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 5
+       }
+      }
+     ]
+    },
+    {
+     "at": "only holds six",
+     "camera": {
+      "focus": "jar",
+      "zoom": 1.4
+     },
+     "beats": [
+      {
+       "at": "holds six",
+       "do": "send",
+       "from": "barista",
+       "to": "jar",
+       "item": "ticket",
+       "dur": 0.6,
+       "arc": 1.2
+      },
+      {
+       "after": 0.6,
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 6
+       }
+      },
+      {
+       "after": 0.0,
+       "do": "label",
+       "actor": "jar",
+       "text": "Full",
+       "tone": "ok"
+      },
+      {
+       "at": "extra tickets",
+       "do": "send",
+       "from": "barista",
+       "to": [
+        10.6,
+        12.6
+       ],
+       "item": "ticket",
+       "size": 1.1,
+       "dur": 1.1,
+       "arc": 3.0,
+       "spin": true,
+       "impact": false
+      },
+      {
+       "at": "fall away",
+       "do": "shake",
+       "actor": "jar"
+      },
+      {
+       "at": "fall away",
+       "do": "state",
+       "actor": "barista",
+       "state": {
+        "pose": "shrug",
+        "expression": "open"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "rush",
+   "mood": "dusk",
+   "transition": {
+    "type": "pan",
+    "dir": "right"
+   },
+   "narration": "Now a crowd rushes in. The first six grab tickets and get served right away. Everyone after that waits for the next ticket to drop.",
+   "actors": [
+    {
+     "id": "floor",
+     "type": "shape",
+     "shape": "ground",
+     "at": [
+      6,
+      7.9
+     ]
+    },
+    {
+     "id": "counter",
+     "type": "prop",
+     "prop": "counter",
+     "at": [
+      9.35,
+      6.2
+     ],
+     "size": 3.6,
+     "allowOverlap": [
+      "jar",
+      "c1",
+      "c2"
+     ]
+    },
+    {
+     "id": "jar",
+     "type": "prop",
+     "prop": "jar",
+     "at": [
+      9.45,
+      4.66
+     ],
+     "size": 1.6,
+     "state": {
+      "count": 6
+     }
+    },
+    {
+     "id": "c1",
+     "type": "character",
+     "at": [
+      8.1,
+      6.6
+     ],
+     "size": 1.45,
+     "allowOverlap": [
+      "c2"
+     ],
+     "look": {
+      "shirt": "sky"
+     }
+    },
+    {
+     "id": "c2",
+     "type": "character",
+     "at": [
+      7.15,
+      7.0
+     ],
+     "size": 1.55,
+     "allowOverlap": [
+      "c1",
+      "c3"
+     ],
+     "look": {
+      "shirt": "lav"
+     }
+    },
+    {
+     "id": "c3",
+     "type": "character",
+     "at": [
+      6.15,
+      7.4
+     ],
+     "size": 1.65,
+     "allowOverlap": [
+      "c2",
+      "c4"
+     ],
+     "look": {
+      "shirt": "amber"
+     }
+    },
+    {
+     "id": "c4",
+     "type": "character",
+     "at": [
+      5.1,
+      7.8
+     ],
+     "size": 1.75,
+     "allowOverlap": [
+      "c3",
+      "c5"
+     ],
+     "look": {
+      "shirt": "mint"
+     }
+    },
+    {
+     "id": "c5",
+     "type": "character",
+     "at": [
+      4.0,
+      8.2
+     ],
+     "size": 1.85,
+     "allowOverlap": [
+      "c4",
+      "c6"
+     ],
+     "look": {
+      "shirt": "coral"
+     }
+    },
+    {
+     "id": "c6",
+     "type": "character",
+     "at": [
+      2.85,
+      8.6
+     ],
+     "size": 1.95,
+     "allowOverlap": [
+      "c5",
+      "c7"
+     ],
+     "look": {
+      "shirt": "sand"
+     }
+    },
+    {
+     "id": "c7",
+     "type": "character",
+     "at": [
+      1.95,
+      9.3
+     ],
+     "size": 2.05,
+     "allowOverlap": [
+      "c6",
+      "c8"
+     ],
+     "look": {
+      "shirt": "sky"
+     }
+    },
+    {
+     "id": "c8",
+     "type": "character",
+     "at": [
+      0.9,
+      10.0
+     ],
+     "size": 2.15,
+     "allowOverlap": [
+      "c7"
+     ],
+     "look": {
+      "shirt": "lav"
+     }
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       5.6,
+       7.7
+      ],
+      "zoom": 0.94
+     },
+     "beats": [
+      {
+       "at": "crowd rushes in",
+       "do": "enter",
+       "actor": "c1",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c2",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c3",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c4",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c5",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c6",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c7",
+       "style": "slide-right"
+      },
+      {
+       "after": 0.08,
+       "do": "enter",
+       "actor": "c8",
+       "style": "slide-right"
+      },
+      {
+       "at": "first six",
+       "do": "send",
+       "from": "jar",
+       "to": "c1",
+       "item": "ticket",
+       "dur": 0.5,
+       "arc": 1.0
+      },
+      {
+       "after": 0.12,
+       "do": "send",
+       "from": "jar",
+       "to": "c2",
+       "item": "ticket",
+       "dur": 0.55,
+       "arc": 1.2
+      },
+      {
+       "after": 0.12,
+       "do": "send",
+       "from": "jar",
+       "to": "c3",
+       "item": "ticket",
+       "dur": 0.6,
+       "arc": 1.4
+      },
+      {
+       "after": 0.12,
+       "do": "send",
+       "from": "jar",
+       "to": "c4",
+       "item": "ticket",
+       "dur": 0.65,
+       "arc": 1.6
+      },
+      {
+       "after": 0.12,
+       "do": "send",
+       "from": "jar",
+       "to": "c5",
+       "item": "ticket",
+       "dur": 0.7,
+       "arc": 1.8
+      },
+      {
+       "after": 0.12,
+       "do": "send",
+       "from": "jar",
+       "to": "c6",
+       "item": "ticket",
+       "dur": 0.75,
+       "arc": 2.0
+      },
+      {
+       "at": "first six",
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 0
+       },
+       "delay": 0.9
+      },
+      {
+       "at": "served right away",
+       "do": "state",
+       "actor": "c1",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.06,
+       "do": "state",
+       "actor": "c2",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.06,
+       "do": "state",
+       "actor": "c3",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.06,
+       "do": "state",
+       "actor": "c4",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.06,
+       "do": "state",
+       "actor": "c5",
+       "state": {
+        "pose": "cheer"
+       }
+      },
+      {
+       "after": 0.06,
+       "do": "state",
+       "actor": "c6",
+       "state": {
+        "pose": "cheer"
+       }
+      }
+     ]
+    },
+    {
+     "at": "Everyone after that",
+     "camera": {
+      "focus": [
+       1.7,
+       8.6
+      ],
+      "zoom": 1.5
+     },
+     "beats": [
+      {
+       "at": "Everyone after",
+       "do": "state",
+       "actor": "c7",
+       "state": {
+        "pose": "sad",
+        "expression": "frown"
+       }
+      },
+      {
+       "after": 0.1,
+       "do": "state",
+       "actor": "c8",
+       "state": {
+        "pose": "sad",
+        "expression": "frown"
+       }
+      },
+      {
+       "at": "waits",
+       "do": "emit",
+       "actor": "c8",
+       "kind": "zzz"
+      },
+      {
+       "at": "waits",
+       "do": "emit",
+       "actor": "c7",
+       "kind": "question"
+      }
+     ]
+    },
+    {
+     "at": "next ticket",
+     "camera": {
+      "focus": "jar",
+      "zoom": 1.6
+     },
+     "beats": [
+      {
+       "at": "next ticket",
+       "do": "label",
+       "actor": "jar",
+       "text": "Empty",
+       "tone": "fail"
+      },
+      {
+       "at": "to drop",
+       "do": "send",
+       "from": [
+        10.0,
+        1.4
+       ],
+       "to": "jar",
+       "item": "ticket",
+       "dur": 0.7,
+       "arc": false
+      },
+      {
+       "after": 0.7,
+       "do": "state",
+       "actor": "jar",
+       "state": {
+        "count": 1
+       }
+      },
+      {
+       "after": 0.0,
+       "do": "label",
+       "actor": "jar",
+       "text": "1 ticket",
+       "tone": "ok"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "reveal",
+   "mood": "night",
+   "transition": {
+    "type": "dissolve"
+   },
+   "narration": "That's a token bucket, the classic way servers do rate limiting. The jar is the bucket, the tickets are tokens, and each customer is a request.",
+   "actors": [
+    {
+     "id": "title",
+     "type": "text",
+     "style": "title",
+     "text": "The **token bucket**",
+     "at": [
+      6,
+      2.8
+     ],
+     "size": 10,
+     "screen": true
+    },
+    {
+     "id": "jar",
+     "type": "prop",
+     "prop": "jar",
+     "at": [
+      6,
+      6.6
+     ],
+     "size": 2.6,
+     "carry": "jar",
+     "state": {
+      "count": 1
+     }
+    },
+    {
+     "id": "bucket",
+     "type": "prop",
+     "prop": "bucket",
+     "at": [
+      6,
+      6.6
+     ],
+     "size": 3.4
+    },
+    {
+     "id": "tokens",
+     "type": "text",
+     "style": "label",
+     "text": "tokens",
+     "tone": "signal",
+     "at": [
+      9.3,
+      4.9
+     ],
+     "size": 2.8
+    },
+    {
+     "id": "client",
+     "type": "node",
+     "icon": "client",
+     "label": "Client",
+     "at": [
+      2.2,
+      10.6
+     ],
+     "size": 2.5
+    },
+    {
+     "id": "api",
+     "type": "node",
+     "icon": "api",
+     "label": "API",
+     "at": [
+      9.8,
+      10.6
+     ],
+     "size": 2.5
+    },
+    {
+     "id": "w1",
+     "type": "connector",
+     "from": "client",
+     "to": "bucket",
+     "curve": "arc",
+     "bend": -1
+    },
+    {
+     "id": "w2",
+     "type": "connector",
+     "from": "bucket",
+     "to": "api",
+     "curve": "arc",
+     "bend": -1
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       6.9
+      ],
+      "zoom": 1.15
+     },
+     "beats": [
+      {
+       "at": "token bucket",
+       "do": "morph",
+       "from": "jar",
+       "to": "bucket"
+      },
+      {
+       "at": "token bucket",
+       "do": "enter",
+       "actor": "title",
+       "style": "words"
+      },
+      {
+       "at": "rate limiting",
+       "do": "pulse",
+       "actor": "bucket"
+      }
+     ]
+    },
+    {
+     "at": "The jar is the bucket",
+     "camera": {
+      "focus": [
+       7.0,
+       6.4
+      ],
+      "zoom": 1.3
+     },
+     "beats": [
+      {
+       "at": "is the bucket",
+       "do": "label",
+       "actor": "bucket",
+       "text": "bucket",
+       "tone": "sky"
+      },
+      {
+       "at": "tickets are tokens",
+       "do": "send",
+       "from": [
+        10.4,
+        2.8
+       ],
+       "to": "bucket",
+       "item": "token",
+       "count": 3,
+       "stagger": 0.18,
+       "dur": 0.75,
+       "size": 0.75
+      },
+      {
+       "at": "are tokens",
+       "do": "enter",
+       "actor": "tokens",
+       "style": "pop"
+      }
+     ]
+    },
+    {
+     "at": "each customer",
+     "camera": {
+      "focus": [
+       6,
+       7.8
+      ],
+      "zoom": 0.98
+     },
+     "beats": [
+      {
+       "at": "each customer",
+       "do": "enter",
+       "actor": "client",
+       "style": "pop"
+      },
+      {
+       "after": 0.1,
+       "do": "enter",
+       "actor": "api",
+       "style": "pop"
+      },
+      {
+       "after": 0.1,
+       "do": "enter",
+       "actor": "w1"
+      },
+      {
+       "after": 0.1,
+       "do": "enter",
+       "actor": "w2"
+      },
+      {
+       "at": "is a request",
+       "do": "send",
+       "via": "w1",
+       "item": "packet",
+       "count": 3,
+       "stagger": 0.25,
+       "dur": 0.8,
+       "to": "bucket"
+      },
+      {
+       "after": 0.9,
+       "do": "send",
+       "via": "w2",
+       "item": "packet",
+       "tone": "ok",
+       "count": 3,
+       "stagger": 0.25,
+       "dur": 0.8,
+       "to": "api"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "reject",
+   "mood": "night",
+   "transition": {
+    "type": "dissolve"
+   },
+   "narration": "Each request spends one token. When a request arrives and the bucket is empty, the server answers four twenty-nine, and can tell the client when to try again.",
+   "actors": [
+    {
+     "id": "bucket",
+     "type": "prop",
+     "prop": "bucket",
+     "at": [
+      6,
+      6.6
+     ],
+     "size": 3.4,
+     "carry": "bucket"
+    },
+    {
+     "id": "client",
+     "type": "node",
+     "icon": "client",
+     "label": "Client",
+     "at": [
+      2.2,
+      10.6
+     ],
+     "size": 2.5,
+     "carry": "client"
+    },
+    {
+     "id": "api",
+     "type": "node",
+     "icon": "api",
+     "label": "API",
+     "at": [
+      9.8,
+      10.6
+     ],
+     "size": 2.5,
+     "carry": "api"
+    },
+    {
+     "id": "w1",
+     "type": "connector",
+     "from": "client",
+     "to": "bucket",
+     "curve": "arc",
+     "bend": -1
+    },
+    {
+     "id": "w2",
+     "type": "connector",
+     "from": "bucket",
+     "to": "api",
+     "curve": "arc",
+     "bend": -1
+    },
+    {
+     "id": "status",
+     "type": "text",
+     "style": "mono",
+     "text": "HTTP 429 Too Many Requests",
+     "tone": "fail",
+     "at": [
+      6,
+      2.7
+     ],
+     "size": 10,
+     "screen": true
+    },
+    {
+     "id": "retry",
+     "type": "text",
+     "style": "mono",
+     "text": "Retry-After: 1",
+     "at": [
+      6,
+      3.4
+     ],
+     "size": 10,
+     "screen": true
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       7.2
+      ],
+      "zoom": 1.15
+     },
+     "beats": [
+      {
+       "at": "spends one token",
+       "do": "send",
+       "via": "w1",
+       "item": "packet",
+       "dur": 0.7,
+       "to": "bucket"
+      },
+      {
+       "after": 0.7,
+       "do": "send",
+       "via": "w2",
+       "item": "token",
+       "size": 0.6,
+       "dur": 0.7,
+       "to": "api"
+      },
+      {
+       "at": "request arrives",
+       "do": "send",
+       "via": "w1",
+       "item": "packet",
+       "dur": 0.7,
+       "to": "bucket"
+      },
+      {
+       "at": "bucket is empty",
+       "do": "shake",
+       "actor": "bucket"
+      },
+      {
+       "at": "bucket is empty",
+       "do": "label",
+       "actor": "bucket",
+       "text": "0 tokens",
+       "tone": "fail"
+      },
+      {
+       "at": "bucket is empty",
+       "do": "highlight",
+       "actor": "bucket",
+       "tone": "fail",
+       "hold": 2.2
+      }
+     ]
+    },
+    {
+     "at": "four twenty-nine",
+     "camera": {
+      "focus": [
+       6,
+       8.0
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "four twenty-nine",
+       "do": "enter",
+       "actor": "status",
+       "style": "type"
+      },
+      {
+       "at": "four twenty-nine",
+       "do": "send",
+       "via": "w1",
+       "reverse": true,
+       "item": "packet",
+       "tone": "fail",
+       "dur": 0.8,
+       "to": "client"
+      },
+      {
+       "after": 0.8,
+       "do": "highlight",
+       "actor": "client",
+       "tone": "fail",
+       "hold": 1.8
+      },
+      {
+       "at": "try again",
+       "do": "enter",
+       "actor": "retry",
+       "style": "type"
+      },
+      {
+       "at": "try again",
+       "do": "emit",
+       "actor": "client",
+       "kind": "zzz"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "github",
+   "mood": "day",
+   "transition": {
+    "type": "iris",
+    "actor": "client"
+   },
+   "narration": "You've seen this in the wild. GitHub's API gives a signed-in user five thousand requests an hour, and every response tells you how many are left.",
+   "actors": [
+    {
+     "id": "quota",
+     "type": "counter",
+     "value": 0,
+     "unit": "/ hour",
+     "style": "display",
+     "at": [
+      6,
+      3.2
+     ],
+     "size": 9,
+     "tone": "ok",
+     "screen": true
+    },
+    {
+     "id": "laptop",
+     "type": "prop",
+     "prop": "laptop",
+     "at": [
+      6,
+      6.2
+     ],
+     "size": 3.6
+    },
+    {
+     "id": "headers",
+     "type": "code",
+     "file": "api.github.com response headers",
+     "code": [
+      "HTTP/2 200",
+      "x-ratelimit-limit: 5000",
+      "x-ratelimit-remaining: 4999",
+      "x-ratelimit-used: 1"
+     ],
+     "at": [
+      6,
+      9.9
+     ],
+     "size": 10.2
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       7.6
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "GitHub's API",
+       "do": "enter",
+       "actor": "headers",
+       "style": "rise"
+      },
+      {
+       "at": "five thousand",
+       "do": "enter",
+       "actor": "quota",
+       "style": "pop"
+      },
+      {
+       "at": "five thousand",
+       "do": "count",
+       "actor": "quota",
+       "to": 5000,
+       "dur": 1.3
+      },
+      {
+       "at": "five thousand",
+       "do": "highlight-lines",
+       "actor": "headers",
+       "lines": [
+        2,
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "at": "every response",
+     "camera": {
+      "focus": [
+       6,
+       7.9
+      ],
+      "zoom": 1.06
+     },
+     "beats": [
+      {
+       "at": "how many are left",
+       "do": "highlight-lines",
+       "actor": "headers",
+       "lines": [
+        3,
+        3
+       ]
+      },
+      {
+       "at": "are left",
+       "do": "count",
+       "actor": "quota",
+       "to": 4999,
+       "dur": 0.4
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "knobs",
+   "mood": "signal",
+   "transition": {
+    "type": "zoom-out"
+   },
+   "narration": "Here's the part pros tune. The bucket size decides how big a burst you allow. The refill rate decides your average. Set both, and one noisy client can't flood your API for everyone else.",
+   "actors": [
+    {
+     "id": "title",
+     "type": "text",
+     "style": "title",
+     "text": "Two knobs to tune",
+     "at": [
+      6,
+      2.8
+     ],
+     "size": 10,
+     "screen": true
+    },
+    {
+     "id": "size",
+     "type": "prop",
+     "prop": "bucket",
+     "at": [
+      3.4,
+      5.6
+     ],
+     "size": 3.0
+    },
+    {
+     "id": "rate",
+     "type": "prop",
+     "prop": "clock",
+     "at": [
+      8.6,
+      5.6
+     ],
+     "size": 2.8
+    },
+    {
+     "id": "sizeT",
+     "type": "text",
+     "style": "label",
+     "text": "size = burst",
+     "at": [
+      3.4,
+      7.9
+     ],
+     "size": 4.4
+    },
+    {
+     "id": "rateT",
+     "type": "text",
+     "style": "label",
+     "text": "refill = average",
+     "at": [
+      8.6,
+      7.9
+     ],
+     "size": 4.2
+    },
+    {
+     "id": "noisy",
+     "type": "node",
+     "icon": "client",
+     "label": "Noisy",
+     "at": [
+      2.3,
+      10.7
+     ],
+     "size": 2.3
+    },
+    {
+     "id": "gate",
+     "type": "prop",
+     "prop": "bucket",
+     "at": [
+      6,
+      10.7
+     ],
+     "size": 1.8
+    },
+    {
+     "id": "api",
+     "type": "node",
+     "icon": "api",
+     "label": "API",
+     "at": [
+      9.7,
+      10.7
+     ],
+     "size": 2.3
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       6.4
+      ],
+      "zoom": 1.1
+     },
+     "beats": [
+      {
+       "at": "bucket size",
+       "do": "enter",
+       "actor": "size",
+       "style": "drop"
+      },
+      {
+       "at": "burst",
+       "do": "enter",
+       "actor": "sizeT",
+       "style": "words"
+      },
+      {
+       "at": "burst",
+       "do": "send",
+       "from": [
+        3.2,
+        1.2
+       ],
+       "to": "size",
+       "item": "token",
+       "count": 5,
+       "stagger": 0.08,
+       "dur": 0.5,
+       "size": 0.6,
+       "arc": false
+      },
+      {
+       "at": "refill rate",
+       "do": "enter",
+       "actor": "rate",
+       "style": "drop"
+      },
+      {
+       "at": "your average",
+       "do": "enter",
+       "actor": "rateT",
+       "style": "words"
+      },
+      {
+       "at": "your average",
+       "do": "spin",
+       "actor": "rate"
+      }
+     ]
+    },
+    {
+     "at": "Set both",
+     "camera": {
+      "focus": [
+       6,
+       8.0
+      ],
+      "zoom": 0.98
+     },
+     "beats": [
+      {
+       "at": "Set both",
+       "do": "enter",
+       "actor": "noisy",
+       "style": "pop"
+      },
+      {
+       "after": 0.1,
+       "do": "enter",
+       "actor": "gate",
+       "style": "pop"
+      },
+      {
+       "after": 0.1,
+       "do": "enter",
+       "actor": "api",
+       "style": "pop"
+      },
+      {
+       "at": "noisy client",
+       "do": "send",
+       "from": "noisy",
+       "to": "gate",
+       "item": "packet",
+       "tone": "fail",
+       "count": 12,
+       "stagger": 0.07,
+       "dur": 0.55,
+       "arc": 0.6
+      },
+      {
+       "at": "noisy client",
+       "do": "emit",
+       "actor": "noisy",
+       "kind": "sweat"
+      },
+      {
+       "at": "can't flood",
+       "do": "send",
+       "from": "gate",
+       "to": "api",
+       "item": "packet",
+       "tone": "ok",
+       "count": 2,
+       "stagger": 0.4,
+       "dur": 0.6,
+       "arc": 0.6
+      },
+      {
+       "at": "everyone else",
+       "do": "highlight",
+       "actor": "api",
+       "tone": "ok",
+       "hold": 2
+      },
+      {
+       "at": "everyone else",
+       "do": "emit",
+       "actor": "api",
+       "kind": "check"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "recap",
+   "mood": "night",
+   "transition": {
+    "type": "pan",
+    "dir": "down"
+   },
+   "narration": "So: refill at a steady rate, spend one token per request, and say no politely when it's empty.",
+   "actors": [
+    {
+     "id": "bucket",
+     "type": "prop",
+     "prop": "bucket",
+     "at": [
+      6,
+      3.7
+     ],
+     "size": 2.4
+    },
+    {
+     "id": "points",
+     "type": "list",
+     "at": [
+      6,
+      8.5
+     ],
+     "size": 10,
+     "items": [
+      {
+       "text": "Refill at a steady rate",
+       "tone": "sky",
+       "icon": "clock"
+      },
+      {
+       "text": "One token per request",
+       "tone": "signal",
+       "icon": "check"
+      },
+      {
+       "text": "Empty bucket? Answer 429",
+       "tone": "fail",
+       "icon": "cross"
+      }
+     ]
+    }
+   ],
+   "shots": [
+    {
+     "camera": {
+      "focus": [
+       6,
+       6.9
+      ],
+      "zoom": 1.0
+     },
+     "beats": [
+      {
+       "at": "So",
+       "do": "enter",
+       "actor": "points",
+       "style": "fade"
+      },
+      {
+       "at": "refill",
+       "do": "reveal",
+       "actor": "points",
+       "index": 0
+      },
+      {
+       "at": "spend one token",
+       "do": "reveal",
+       "actor": "points",
+       "index": 1
+      }
+     ]
+    },
+    {
+     "at": "say no politely",
+     "camera": {
+      "focus": [
+       6,
+       7.6
+      ],
+      "zoom": 1.12
+     },
+     "beats": [
+      {
+       "at": "say no politely",
+       "do": "reveal",
+       "actor": "points",
+       "index": 2
+      },
+      {
+       "at": "empty",
+       "do": "emit",
+       "actor": "bucket",
+       "kind": "sparkle"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

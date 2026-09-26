@@ -13,7 +13,33 @@ export const ease = {
   inOutCubic: (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2),
   outExpo: (x) => (x >= 1 ? 1 : 1 - 2 ** (-10 * x)),
   inOutSine: (x) => -(Math.cos(Math.PI * x) - 1) / 2,
+  // Overshoot then settle: follow-through for arrivals.
+  outBack: (x) => 1 + 2.2 * (x - 1) ** 3 + 1.2 * (x - 1) ** 2,
+  // Small wind-up before the move, settle after: anticipation + follow-through.
+  inOutBack: (x) => {
+    const c = 1.2 * 1.525;
+    return x < 0.5
+      ? ((2 * x) ** 2 * ((c + 1) * 2 * x - c)) / 2
+      : ((2 * x - 2) ** 2 * ((c + 1) * (x * 2 - 2) + c) + 2) / 2;
+  },
+  // A spring squeezed into [0,1] of a tween's duration (settles by the end).
+  spring: (x) => (x >= 1 ? 1 : springAt(x * 1.1)),
 };
+
+function springAt(tau, stiffness = 170, damping = 15) {
+  const w0 = Math.sqrt(stiffness);
+  const zeta = damping / (2 * w0);
+  const wd = w0 * Math.sqrt(1 - zeta * zeta);
+  return 1 - Math.exp(-zeta * w0 * tau) * (Math.cos(wd * tau) + ((zeta * w0) / wd) * Math.sin(wd * tau));
+}
+
+// Stable per-id pseudo-random in [0,1): idle motion phases differ per actor but never
+// change between renders.
+export function hash01(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 10000) / 10000;
+}
 
 // Eased 0..1 progress of a tween that starts at `start` and lasts `dur`.
 export function prog(t, start, dur, e = ease.outCubic) {
@@ -62,6 +88,8 @@ export const TONES = {
   signal: [255, 178, 62],
   ok: [107, 221, 168],
   fail: [255, 111, 97],
+  sky: [124, 196, 255],
+  lavender: [185, 162, 255],
   ground: [17, 34, 42],
 };
 

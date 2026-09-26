@@ -1,0 +1,340 @@
+"""The writing and directing stages: topic → script → accuracy review → storyboard → scenes.
+
+Every stage follows the same loop: prompt with a skill (design/*.md) plus a worked example,
+validate the reply against hard rules in code, and on failure send the exact violations back
+for a repair attempt. Small local models are unreliable on first try; they are much better at
+fixing a specific, named problem — so the rules live here, not only in the prompt.
+"""
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from . import library, plan as plan_mod
+from .llm import LLM, LLMError
+from .timeline import _norm_tokens
+
+ROOT = Path(__file__).resolve().parent.parent
+DESIGN = ROOT / "design"
+EXAMPLE = ROOT / "examples" / "token_bucket"
+
+CATEGORIES = [
+    "system design", "networking", "databases", "distributed systems", "operating systems", "security",
+    "web & APIs", "data structures & algorithms", "cloud & devops", "concurrency", "caching & performance",
+]
+SCRIPT_PARTS = ["hook", "analogy", "reveal", "mechanism", "example", "insight", "recap"]
+BANNED = ["in this video", "basically", "essentially", "it's important to note", "let's dive", "delve"]
+
+
+class StageError(RuntimeError):
+    pass
+
+
+def _read(p: Path) -> str:
+    return p.read_text(encoding="utf-8")
+
+
+def _log(msg: str) -> None:
+    print(f"  {msg}", flush=True)
+
+
+def _loop(llm: LLM, system: str, user: str, check, *, attempts: int = 3, temperature: float = 0.6,
+          max_tokens: int = 4096, label: str = "stage") -> dict:
+    """Ask, validate with `check(out) -> list[str]` (problems), repair until clean."""
+    prompt = user
+    out, problems = None, []
+    for i in range(attempts):
+        try:
+            out = llm.json(system, prompt, temperature=temperature, max_tokens=max_tokens)
+        except LLMError as e:
+            problems = [str(e)]
+            continue
+        problems = check(out)
+        if not problems:
+            return out
+        _log(f"{label}: attempt {i + 1} had {len(problems)} problem(s): {problems[0][:140]}")
+        prompt = (f"{user}\n\nYour previous answer:\n{json.dumps(out, ensure_ascii=False)}\n\n"
+                  "It has these problems — fix ALL of them and return the complete corrected JSON:\n- "
+                  + "\n- ".join(problems[:12]))
+        temperature = max(0.2, temperature - 0.15)
+    raise StageError(f"{label} failed after {attempts} attempts: {problems[:5]}")
+
+
+# ---- 1. topic -----------------------------------------------------------------------------------
+def choose_topic(llm: LLM, requested: str | None = None, category: str | None = None) -> dict:
+    """Pick a topic no existing video covers. A requested topic that's already been made is
+    reported and replaced by a fresh one (the pipeline never remakes a video)."""
+    if requested:
+        dup = library.find_duplicate(requested, [], llm.embed(requested))
+        if not dup:
+            return {"topic": requested, "category": category or "", "keywords": [], "angle": "", "analogy": "", "real_example": ""}
+        _log(f"topic {requested!r} already made as {dup[0]['slug']!r} ({dup[2]}, {dup[1]}); choosing another")
+
+    existing = [v["title"] or v["topic"] for v in library.all_videos()][:80]
+    system = ("You choose topics for 60-90 second animated explainer videos about software engineering. "
+              "Reply with JSON only.")
+    rejected: list[str] = []
+    for round_ in range(3):
+        user = f"""Suggest 6 candidate topics{f' in the category "{category}"' if category else ' across these categories: ' + ', '.join(CATEGORIES)}.
+
+Each topic must:
+- be ONE concrete mechanism, narrow enough to explain in 90 seconds (good: "how a token bucket rate limiter works"; too broad: "microservices");
+- be explainable with an everyday real-life analogy (a shop, post office, kitchen, traffic, library...);
+- teach a beginner something AND give a working engineer a trade-off or real number they'd value;
+- have a real, verifiable technical example (a product, protocol, status code, header, or config).
+
+Already made — do NOT suggest these or close variants:
+{json.dumps(existing + rejected, ensure_ascii=False)}
+
+Example of one candidate:
+{_read(EXAMPLE / "topic.json")}
+
+Reply: {{"candidates": [{{"topic", "category", "angle", "analogy", "real_example", "keywords": [5-8 lowercase terms]}}]}}"""
+        out = llm.json(system, user, temperature=0.9)
+        for c in out.get("candidates", []):
+            t = (c.get("topic") or "").strip()
+            if not t:
+                continue
+            dup = library.find_duplicate(t, c.get("keywords", []), llm.embed(t))
+            if dup:
+                _log(f"skip {t!r}: too close to {dup[0]['slug']!r} ({dup[2]} {dup[1]})")
+                rejected.append(t)
+                continue
+            return c
+        _log(f"round {round_ + 1}: every candidate was a duplicate; asking again")
+    raise StageError("could not find a topic that hasn't been made already")
+
+
+# ---- 2. script ------------------------------------------------------------------------------------
+def split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", text.strip()) if s.strip()]
+
+
+def script_text(script: dict) -> str:
+    return " ".join(s["text"].strip() for s in script["sections"])
+
+
+def check_script(s: dict) -> list[str]:
+    p = []
+    secs = s.get("sections") or []
+    parts = [x.get("part") for x in secs]
+    for need in ("hook", "analogy", "reveal", "example", "insight", "recap"):
+        if need not in parts:
+            p.append(f"missing a '{need}' section")
+    if parts and parts[0] != "hook":
+        p.append("the first section must be the hook")
+    if parts and parts[-1] != "recap":
+        p.append("the last section must be the recap")
+    text = " ".join(x.get("text", "") for x in secs)
+    n = len(text.split())
+    if n < 160:
+        p.append(f"script is {n} words; it must be 160-240 (60-90 seconds). Expand the analogy and mechanism.")
+    if n > 245:
+        p.append(f"script is {n} words; it must be 160-240. Cut the least essential sentences.")
+    for sent in split_sentences(text):
+        if len(sent.split()) > 26:
+            p.append(f"sentence too long for narration ({len(sent.split())} words): {sent[:80]!r}")
+    for b in BANNED:
+        if b in text.lower():
+            p.append(f"remove the filler phrase {b!r}")
+    if re.search(r"[()\[\]]", text):
+        p.append("no parentheses or brackets — this is read aloud")
+    if not (s.get("analogy") or {}).get("mapping"):
+        p.append("analogy.mapping must map each everyday part to its technical counterpart")
+    if not s.get("claims"):
+        p.append("list every factual claim in 'claims' so it can be fact-checked")
+    return p
+
+
+def write_script(llm: LLM, topic: dict, feedback: list[str] | None = None) -> dict:
+    system = "You write narration scripts for animated engineering explainers. Reply with JSON only.\n\n" + _read(DESIGN / "TEACHING_SCRIPT_SKILL.md")
+    user = f"""Topic:
+{json.dumps(topic, ensure_ascii=False, indent=1)}
+
+A finished script for a different topic, showing the exact JSON shape and the level of plain-spoken teaching expected:
+{_read(EXAMPLE / "script.json")}
+
+Write the script for the topic above. Sections in order: {", ".join(SCRIPT_PARTS)} ("mechanism" may be merged into "reveal" if short).
+{"Reviewer corrections you MUST apply:" + chr(10) + chr(10).join("- " + f for f in feedback) if feedback else ""}"""
+    return _loop(llm, system, user, check_script, label="script", temperature=0.7)
+
+
+# ---- 3. accuracy review ----------------------------------------------------------------------------
+def review_script(llm: LLM, script: dict) -> dict:
+    """A second, independent pass that hunts for wrong or overstated claims. Like Antiquary's
+    fact-check: 'nothing flagged' is not proof of accuracy — the human review stays load-bearing."""
+    system = ("You are a senior software engineer reviewing an educational script for technical accuracy. "
+              "Be strict about numbers, product behaviour, protocol details and overgeneralisation. Reply with JSON only.")
+    user = f"""Script:
+{script_text(script)}
+
+Claims the writer listed:
+{json.dumps(script.get("claims", []), ensure_ascii=False)}
+
+Check every factual statement (including ones not in the list). Also flag analogies that would teach something false.
+Reply: {{"issues": [{{"quote": "exact words", "problem": "what is wrong or unverifiable", "severity": "high|medium|low", "fix": "corrected wording"}}], "verdict": "ok|revise"}}"""
+    out = llm.json(system, user, temperature=0.2)
+    out.setdefault("issues", [])
+    return out
+
+
+# ---- 4. storyboard ---------------------------------------------------------------------------------
+def check_storyboard(sb: dict, n_sent: int) -> list[str]:
+    p = []
+    scenes = sb.get("scenes") or []
+    if not 5 <= len(scenes) <= 11:
+        p.append(f"{len(scenes)} scenes; use 6-10")
+    expect = 0
+    for i, s in enumerate(scenes):
+        rng = s.get("sentences")
+        if not (isinstance(rng, list) and len(rng) == 2 and all(isinstance(x, int) for x in rng)):
+            p.append(f"scene {i + 1}: 'sentences' must be [first, last] sentence numbers")
+            continue
+        if rng[0] != expect:
+            p.append(f"scene {i + 1} starts at sentence {rng[0]} but must start at {expect} — every sentence, in order, exactly once")
+        if rng[1] < rng[0]:
+            p.append(f"scene {i + 1}: last sentence before first")
+        expect = rng[1] + 1
+        if rng[1] - rng[0] > 3:
+            p.append(f"scene {i + 1} covers {rng[1] - rng[0] + 1} sentences; max 4 — split it")
+        if s.get("mood") not in plan_mod.MOODS:
+            p.append(f"scene {i + 1}: mood must be one of {sorted(plan_mod.MOODS)}")
+        if len(s.get("shots") or []) < (1 if i == len(scenes) - 1 else 2):
+            p.append(f"scene {i + 1}: plan 2-4 shots (camera framings) so it is a scene, not a slide")
+    if expect != n_sent:
+        p.append(f"scenes cover sentences 0..{expect - 1} but the script has {n_sent} (0..{n_sent - 1})")
+    moods = [s.get("mood") for s in scenes]
+    for i in range(2, len(moods)):
+        if moods[i] == moods[i - 1] == moods[i - 2]:
+            p.append(f"scenes {i - 1}-{i + 1} all use mood {moods[i]!r}; never 3 in a row")
+    if moods.count("signal") > 1:
+        p.append("use the 'signal' mood at most once (the key insight)")
+    if sum(m in ("day", "dusk") for m in moods) < 0.35 * max(len(moods), 1):
+        p.append("at least 40% of scenes should be real-world analogy scenes (mood day or dusk)")
+    trans = [(s.get("transition") or {}).get("type") for s in scenes[1:]]
+    for i in range(2, len(trans)):
+        if trans[i] == trans[i - 1] == trans[i - 2]:
+            p.append(f"transition {trans[i]!r} used 3 times in a row; vary them")
+    return p
+
+
+def storyboard(llm: LLM, script: dict) -> dict:
+    sents = split_sentences(script_text(script))
+    system = ("You are the director of an animated explainer. You break a narration into scenes and plan each "
+              "scene's shots. Reply with JSON only.\n\n" + _read(DESIGN / "SCENE_DESIGN_SKILL.md"))
+    numbered = "\n".join(f"{i}: {s}" for i, s in enumerate(sents))
+    ex_script = split_sentences(script_text(json.loads(_read(EXAMPLE / "script.json"))))
+    user = f"""Narration, one numbered sentence per line:
+{numbered}
+
+The analogy and its mapping: {json.dumps(script.get("analogy"), ensure_ascii=False)}
+
+Group consecutive sentences into 6-10 scenes (1-4 sentences each, every sentence exactly once, in order).
+For each scene decide mood, transition from the previous scene, the setting, what visibly HAPPENS, and 2-4 shots.
+
+Worked example (for its own {len(ex_script)}-sentence script):
+{_read(EXAMPLE / "storyboard.json")}
+
+Reply with the same JSON shape: {{"scenes": [{{"id", "sentences": [first, last], "purpose", "mood", "transition", "setting", "visual", "shots": [...], "carry": [...]}}]}}"""
+    sb = _loop(llm, system, user, lambda o: check_storyboard(o, len(sents)), label="storyboard", temperature=0.6)
+    for s in sb["scenes"]:
+        a, b = s["sentences"]
+        s["narration"] = " ".join(sents[a:b + 1])
+    return sb
+
+
+# ---- 5. scene design --------------------------------------------------------------------------------
+def dsl_reference() -> str:
+    return (_read(DESIGN / "SCENE_DSL.md")
+            .replace("{PROPS}", ", ".join(sorted(plan_mod.PROP_HEIGHTS)))
+            .replace("{ICONS}", ", ".join(sorted(plan_mod.ICONS)))
+            .replace("{POSES}", ", ".join(sorted(plan_mod.POSES))))
+
+
+def check_scene(scene: dict, sb_scene: dict, index: int, prev_ids: set[str], last: bool) -> list[str]:
+    scene = json.loads(json.dumps(scene))  # validate a copy
+    scene["narration"] = sb_scene["narration"]
+    _, errors, _ = plan_mod.validate_scene(scene, index, prev_ids)
+    p = list(errors)
+    narr = " ".join(_norm_tokens(sb_scene["narration"]))
+    shots = scene.get("shots") or []
+    if len(shots) < 2 and len(sb_scene["narration"].split()) > 14:
+        p.append("use 2-4 shots with different camera framings (focus/zoom) — one static framing is a slide")
+    verbs = [b.get("do") for s in shots for b in s.get("beats", [])]
+    if not set(verbs) & {"send", "move", "morph", "state", "count", "reveal", "highlight-lines", "emit", "say"}:
+        p.append("nothing HAPPENS: add actions (send, move, morph, state, count, emit, say) that act out the narration")
+    for s in shots:
+        for b in [s] + s.get("beats", []):
+            if b.get("at") and " ".join(_norm_tokens(b["at"])) not in narr:
+                p.append(f"'at' phrase {b['at']!r} is not in the narration — copy words exactly")
+    for s in shots[1:]:
+        if not s.get("at"):
+            p.append("every shot after the first needs an 'at' phrase saying when the camera moves")
+    texts = [a for a in scene.get("actors", []) if a.get("type") == "text"]
+    if len(texts) > 3:
+        p.append(f"{len(texts)} text actors; max 3 per scene — the captions already carry the narration")
+    if len(scene.get("actors", [])) > 12:
+        p.append("more than 12 actors; simplify")
+    return p
+
+
+def design_scene(llm: LLM, script: dict, sb: dict, i: int, prev_scene: dict | None, lint_notes: list[str] | None = None,
+                 current: dict | None = None) -> dict:
+    s = sb["scenes"][i]
+    example = json.loads(_read(EXAMPLE / "plan.json"))["scenes"]
+    ex = [e for e in example if e["id"] in ("shop", "reveal")]
+    system = ("You design ONE scene of an animated vertical explainer video as JSON in the Scene DSL. "
+              "You are a motion designer: stage real action, not slides. Reply with JSON only.\n\n"
+              + _read(DESIGN / "SCENE_DESIGN_SKILL.md") + "\n\n" + dsl_reference())
+    prev = ""
+    if prev_scene:
+        prev = "Previous scene (you may `carry` its actors by id, or use its actors as zoom-in/iris origin):\n" + json.dumps(
+            {"id": prev_scene["id"], "mood": prev_scene["mood"],
+             "actors": [{k: a.get(k) for k in ("id", "type", "prop", "icon", "at", "size") if a.get(k) is not None} for a in prev_scene["actors"]]},
+            ensure_ascii=False)
+    overview = "\n".join(f"{k + 1}. [{x['mood']}] {x['purpose']}: {x['visual']}" for k, x in enumerate(sb["scenes"]))
+    user = f"""Video: {script.get("title")}
+Analogy mapping: {json.dumps(script.get("analogy"), ensure_ascii=False)}
+
+All scenes (you are designing #{i + 1}):
+{overview}
+
+{prev}
+
+Scene #{i + 1} brief:
+{json.dumps({k: s.get(k) for k in ("id", "purpose", "mood", "transition", "setting", "visual", "shots", "carry")}, ensure_ascii=False, indent=1)}
+
+Narration for this scene (copy `at` phrases from it exactly):
+"{s["narration"]}"
+
+Two finished scenes from another video, for the level of staging expected:
+{json.dumps(ex, ensure_ascii=False)}
+{"" if not current else chr(10) + "Your current design of this scene:" + chr(10) + json.dumps(current, ensure_ascii=False)}
+{"" if not lint_notes else chr(10) + "The rendered frames showed these layout problems — fix them:" + chr(10) + chr(10).join("- " + n for n in lint_notes)}
+Reply with the scene JSON: {{"id", "mood", "transition", "actors", "layouts"?, "shots"}} (narration is added for you)."""
+    prev_ids = {a["id"] for a in prev_scene["actors"]} if prev_scene else set()
+    out = _loop(llm, system, user, lambda o: check_scene(o, s, i, prev_ids, i == len(sb["scenes"]) - 1),
+                label=f"scene {i + 1}", temperature=0.55, max_tokens=6000)
+    out["narration"] = s["narration"]
+    out.setdefault("id", s.get("id") or f"s{i + 1}")
+    out.setdefault("mood", s.get("mood", "night"))
+    if i and not out.get("transition"):
+        out["transition"] = s.get("transition") or {"type": "dissolve"}
+    return out
+
+
+def describe_lint(issue: dict, scene_start: float) -> str:
+    t = round(issue.get("t", 0) - scene_start, 1)
+    k = issue["kind"]
+    if k == "outside_safe_area":
+        return f"at {t}s, actor {issue['actor']!r} sticks {issue['px']}px outside the safe area (x 1-11, y 2.6-12.6): move it inward or make it smaller"
+    if k == "overlap":
+        return f"at {t}s, actors {issue['actors']} overlap ({int(issue['frac'] * 100)}% of the smaller one): separate them, or list each other in allowOverlap if intentional (e.g. a person in front of a counter)"
+    if k == "text_too_small":
+        return f"at {t}s, text {issue['actor']!r} renders at {issue['px']}px — too small to read on a phone; use a bigger style or camera zoom"
+    if k == "crowded":
+        return f"at {t}s, {issue['count']} separate things are on screen; keep it to 7 or fewer"
+    if k == "empty_frame":
+        return f"at {t}s the frame is empty — something should be on screen for the whole scene"
+    return json.dumps(issue)

@@ -1,0 +1,8 @@
+{
+  "topic": "Rate limiting with the token bucket algorithm",
+  "category": "web & APIs",
+  "angle": "Why an API answers 429, and the two knobs that decide when",
+  "analogy": "A coffee shop that hands out tickets from a jar the barista refills once a second",
+  "real_example": "GitHub's REST API: 5,000 requests per hour for signed-in users, x-ratelimit-* headers",
+  "keywords": ["rate limiting", "token bucket", "429", "throttling", "burst", "api"]
+}
