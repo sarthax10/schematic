@@ -292,6 +292,23 @@ def check_storyboard(sb: dict, n_sent: int) -> list[str]:
     return p
 
 
+def fix_storyboard(sb: dict) -> dict:
+    """Deterministic repairs: a full list of sentence numbers becomes [first, last]; three
+    analogy scenes in a row alternate day/dusk (same meaning, visible variety)."""
+    for sc in sb.get("scenes") or []:
+        rng = sc.get("sentences")
+        if isinstance(rng, list) and len(rng) != 2 and rng and all(isinstance(x, int) for x in rng):
+            sc["sentences"] = [min(rng), max(rng)]
+        elif isinstance(rng, list) and len(rng) == 1 and isinstance(rng[0], int):
+            sc["sentences"] = [rng[0], rng[0]]
+    scenes = sb.get("scenes") or []
+    for i in range(2, len(scenes)):
+        m = [scenes[k].get("mood") for k in (i - 2, i - 1, i)]
+        if m[0] == m[1] == m[2] and m[1] in ("day", "dusk"):
+            scenes[i - 1]["mood"] = "dusk" if m[1] == "day" else "day"
+    return sb
+
+
 def storyboard(llm: LLM, script: dict) -> dict:
     sents = split_sentences(script_text(script))
     system = ("You are the director of an animated explainer. You break a narration into scenes and plan each "
@@ -310,7 +327,8 @@ Worked example (for its own {len(ex_script)}-sentence script):
 {_read(EXAMPLE / "storyboard.json")}
 
 Reply with the same JSON shape: {{"scenes": [{{"id", "sentences": [first, last], "purpose", "mood", "transition", "setting", "visual", "shots": [...], "carry": [...]}}]}}"""
-    sb = _loop(llm, system, user, lambda o: check_storyboard(o, len(sents)), label="storyboard", temperature=0.6)
+    sb = _loop(llm, system, user, lambda o: check_storyboard(o, len(sents)), label="storyboard", temperature=0.6,
+               fix=fix_storyboard)
     for s in sb["scenes"]:
         a, b = s["sentences"]
         s["narration"] = " ".join(sents[a:b + 1])
