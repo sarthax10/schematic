@@ -1,6 +1,5 @@
-# Schematic's own Ollama, deliberately separate from Antiquary's (antiquary-ollama):
-# concurrent requests on one CPU-bound Ollama caused truncated output in Antiquary, so the two
-# apps never share an instance. No GPU on this machine; Ollama runs on CPU.
+# Schematic's Ollama. This server runs one application at a time, so it gets the whole
+# machine (no CPU/memory caps). No GPU here; Ollama runs on CPU.
 name: schematic
 services:
   ollama:
@@ -10,15 +9,10 @@ services:
     ports:
       - "127.0.0.1:11435:11434"   # localhost only; reach it through an SSH tunnel
     environment:
-      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_NUM_PARALLEL: "1"     # the pipeline makes one request at a time
       OLLAMA_MAX_LOADED_MODELS: "1"
-      OLLAMA_KEEP_ALIVE: "10m"     # unload after 10 idle minutes to give RAM back
+      OLLAMA_KEEP_ALIVE: "30m"
     volumes:
       - schematic_ollama_data:/root/.ollama
-    deploy:
-      resources:
-        limits:
-          cpus: "6"                # leave headroom for the Antiquary stack
-          memory: 9g
 volumes:
   schematic_ollama_data:
