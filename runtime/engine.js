@@ -8,6 +8,7 @@ import { clamp, css, ease, el, envelope, hash01, latest, lerp, prog, rgb, spring
 import { applyMood, mood } from "./moods.js";
 import * as basic from "./actors/basic.js";
 import * as character from "./actors/character.js";
+import * as structures from "./actors/structures.js";
 import { PROPS } from "./props.js";
 
 export const U = 90; // one grid unit in px
@@ -19,6 +20,7 @@ const FACTORIES = {
   text: basic.text, prop: basic.prop, node: basic.node, icon: basic.glyph, shape: basic.shape,
   counter: basic.counter, meter: basic.meter, bars: basic.bars, list: basic.list, code: basic.code,
   character: character.create,
+  ring: structures.ring, array: structures.array, stack: structures.stack, tree: structures.tree, hashmap: structures.hashmap,
 };
 
 // ---- keyframe tracks -------------------------------------------------------------------------
@@ -74,7 +76,12 @@ export function buildScene(scene, host) {
   for (const spec of scene.actors || []) {
     if (spec.type === "connector") continue;
     const mine = byActor(spec.id);
-    spec._states = mine.filter((b) => ["state", "count", "reveal", "highlight-lines"].includes(b.do)).map((b) => {
+    spec._states = mine.filter((b) => ["state", "count", "reveal", "highlight-lines", "op"].includes(b.do)).map((b) => {
+      if (b.do === "op") {
+        // Data-structure operations keep every field (op, value, index, name, key, ...).
+        const { do: _d, actor: _a, at: _at, after: _af, ...rest } = b;
+        return { ...rest, t: b.t };
+      }
       const s = { t: b.t, ...(b.state || {}) };
       if (b.do === "count") { s.to = b.to; s.dur = b.dur; }
       if (b.do === "reveal") s.index = b.index;

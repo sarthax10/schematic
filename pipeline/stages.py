@@ -353,7 +353,7 @@ def check_scene(scene: dict, sb_scene: dict, index: int, prev_ids: set[str], las
     if len(shots) < 2 and len(sb_scene["narration"].split()) > 14:
         p.append("use 2-4 shots with different camera framings (focus/zoom) — one static framing is a slide")
     verbs = [b.get("do") for s in shots for b in s.get("beats", [])]
-    if not set(verbs) & {"send", "move", "morph", "state", "count", "reveal", "highlight-lines", "emit", "say"}:
+    if not set(verbs) & {"send", "move", "morph", "state", "count", "reveal", "highlight-lines", "emit", "say", "op"}:
         p.append("nothing HAPPENS: add actions (send, move, morph, state, count, emit, say) that act out the narration")
     for s in shots:
         for b in [s] + s.get("beats", []):

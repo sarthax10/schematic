@@ -41,7 +41,7 @@ html, body { margin: 0; background: #060b0d; }
 
 .actor { position: absolute; transform-origin: 50% 50%; will-change: transform, opacity; }
 .actor .inner { width: 100%; height: 100%; }
-.a-prop, .a-glyph { width: 100%; height: 100%; }
+.a-prop, .a-glyph, .a-struct { width: 100%; height: 100%; }
 .a-glyph svg { width: 100%; height: 100%; }
 
 /* ---- text ---- */

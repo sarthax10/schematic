@@ -54,3 +54,11 @@ Actors without an `enter` beat are on set from the start. Draw order = list orde
 - `emit` {actor, kind: sparkle|question|exclaim|zzz|sweat|check|cross|dust}
 - `pulse` · `shake` · `hop` · `wiggle` · `spin` {actor}
 - `scale` {actor, to} · `rotate` {actor, to} · `flash` {tone}
+
+## Data structures (stateful actors driven by `op` beats)
+- `ring` — `slots` (4-12), `values` (initial), `writeLabel`, `readLabel`. Ops: `write {value}`, `read`. Full → next write overwrites the oldest.
+- `array` — `values` (≤ 9). Ops: `pointer {name, index}`, `set {index, value}`, `swap {i, j}`, `highlight {from, to, tone}`, `dim {from, to}`, `found {index}`.
+- `stack` — `kind`: stack | queue, `capacity`, `values`. Ops: `push {value}` / `pop` (stack), `enqueue {value}` / `dequeue` (queue).
+- `tree` — binary search tree from `values` (insertion order). Ops: `insert {value}`, `search {value}` (a cursor walks down comparing).
+- `hashmap` — `buckets` (3-8). Ops: `put {key, bucket?}`, `get {key, bucket?}` (bucket forces a collision for teaching).
+Beat form: `{"at": "...", "do": "op", "actor": "<id>", "op": "write", "value": "G"}`.

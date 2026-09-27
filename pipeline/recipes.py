@@ -641,6 +641,164 @@ _r("recap", "the closing summary: up to 3 short rules revealed one by one",
      {"text": "Always set an expiry", "tone": "sky", "cue": "set an expiry"}, {"text": "Never cache secrets", "tone": "fail", "cue": "never cache"}]}))
 
 
+# ---- data-structure recipes ---------------------------------------------------------------------
+# The hero is a stateful structure actor (runtime/actors/structures.js) driven by `op` beats;
+# the recipe only times the operations to the narration and moves the camera.
+def _op_beats(actor: str, ops: list[dict], c: Cues, keys: tuple[str, ...], gap: float = 0.9) -> list[dict]:
+    beats = []
+    for k, o in enumerate(ops):
+        b = {"do": "op", "actor": actor, "op": o.get("op")}
+        for key in keys:
+            if o.get(key) not in (None, ""):
+                b[key] = o[key]
+        if o.get("cue"):
+            b["at"] = c.get(o["cue"], (k + 0.5) / (len(ops) + 1))
+        else:
+            b["after"] = gap if beats else 0.3
+        beats.append(b)
+    return beats
+
+
+def _split_shots(beats: list[dict], wide: dict, close: dict) -> list[dict]:
+    """First half of the operations in a wide shot, the rest in a push-in on the first cued
+    beat of the second half (every shot after the first needs a spoken cue)."""
+    # Split at a *cued* beat at or after the middle, so the second shot starts exactly on
+    # that beat and every uncued beat stays chained to the one before it, in order.
+    half = max(1, (len(beats) + 1) // 2)
+    split = next((i for i in range(half, len(beats)) if beats[i].get("at")), None)
+    if split is None:
+        return [{"camera": wide, "beats": beats}]
+    return [{"camera": wide, "beats": beats[:split]},
+            {"at": beats[split]["at"], "camera": close, "beats": beats[split:]}]
+
+
+def build_ring(s: dict, c: Cues) -> dict:
+    """A ring buffer: slots in a circle, a write pointer chasing a read pointer; when full,
+    the next write overwrites the oldest value."""
+    slots = max(4, min(12, int(s.get("slots") or 8)))
+    actors = headline(s.get("headline")) + [{
+        "id": "ring", "type": "ring", "slots": slots, "values": [str(v)[:5] for v in (s.get("values") or [])][:slots],
+        "writeLabel": (s.get("write_label") or "write")[:8], "readLabel": (s.get("read_label") or "read")[:8],
+        "at": [6, 8.2], "size": 7.4}]
+    ops = [{**o, "value": str(o.get("value", ""))[:5]} for o in (s.get("ops") or [])[:10] if o.get("op") in ("write", "read")]
+    beats = _op_beats("ring", ops, c, ("value",))
+    return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.7], "zoom": 1.0}, {"focus": [6, 8.0], "zoom": 1.06})}
+
+
+def build_array(s: dict, c: Cues) -> dict:
+    """An array with named pointers, highlighted ranges, swaps and eliminated halves
+    (binary search, two pointers, sliding window, sorting steps)."""
+    vals = [str(v)[:5] for v in (s.get("values") or [])][:9] or ["?"]
+    actors = headline(s.get("headline")) + [{"id": "arr", "type": "array", "values": vals, "at": [6, 7.4], "size": 9.4}]
+    if s.get("caption"):
+        actors.append({"id": "cap", "type": "text", "style": "label", "text": s["caption"][:28], "tone": "signal", "at": [6, 4.6], "size": 9})
+    ops = [o for o in (s.get("ops") or [])[:12] if o.get("op") in ("pointer", "set", "swap", "highlight", "dim", "found")]
+    beats = _op_beats("arr", ops, c, ("name", "index", "from", "to", "i", "j", "value", "tone"), gap=0.8)
+    return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.4], "zoom": 1.0}, {"focus": [6, 7.6], "zoom": 1.08})}
+
+
+def build_stack(s: dict, c: Cues) -> dict:
+    """A stack (last in, first out) or a queue (first in, first out), pushed and popped."""
+    queue = s.get("kind") == "queue"
+    ops = [o for o in (s.get("ops") or [])[:10] if o.get("op") in (("enqueue", "dequeue") if queue else ("push", "pop"))]
+    # Accept the other family's verbs rather than dropping the model's intent.
+    if not ops:
+        mapping = {"push": "enqueue", "pop": "dequeue"} if queue else {"enqueue": "push", "dequeue": "pop"}
+        ops = [{**o, "op": mapping[o["op"]]} for o in (s.get("ops") or [])[:10] if o.get("op") in mapping]
+    cap = max(3, min(7, int(s.get("capacity") or 5)))
+    act = {"id": "st", "type": "stack", "kind": "queue" if queue else "stack", "capacity": cap,
+           "values": [str(v)[:6] for v in (s.get("values") or [])][:cap]}
+    act.update({"at": [6, 7.6], "size": 10.2} if queue else {"at": [6, 7.9], "size": 5.4})
+    actors = headline(s.get("headline")) + [act]
+    beats = _op_beats("st", [{**o, "value": str(o.get("value", ""))[:6]} for o in ops], c, ("value",))
+    close = {"focus": [6, 7.6], "zoom": 1.1} if queue else {"focus": [6, 7.2], "zoom": 1.12}
+    return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.6], "zoom": 1.0}, close)}
+
+
+def build_tree(s: dict, c: Cues) -> dict:
+    """A binary search tree: a cursor walks down comparing at each node; inserts grow a new
+    branch, searches end found (green) or missing (red)."""
+    vals = [str(v)[:4] for v in (s.get("values") or [])][:8]
+    ops = [{**o, "value": str(o.get("value", ""))[:4]} for o in (s.get("ops") or [])[:5] if o.get("op") in ("insert", "search")]
+    actors = headline(s.get("headline")) + [{"id": "bst", "type": "tree", "values": vals, "at": [6, 8.4], "size": 9.0}]
+    beats = _op_beats("bst", ops, c, ("value",), gap=2.0)
+    return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.8], "zoom": 1.0}, {"focus": [6, 8.2], "zoom": 1.04})}
+
+
+def build_hashmap(s: dict, c: Cues) -> dict:
+    """A hash map: keys go through the hash function into buckets; collisions chain."""
+    buckets = max(3, min(8, int(s.get("buckets") or 5)))
+    ops = []
+    for o in (s.get("ops") or [])[:8]:
+        if o.get("op") in ("put", "get") and o.get("key"):
+            o = {**o, "key": str(o["key"])[:8]}
+            if o.get("bucket") is not None:
+                try:
+                    o["bucket"] = max(0, min(buckets - 1, int(o["bucket"])))
+                except (TypeError, ValueError):
+                    o.pop("bucket")
+            ops.append(o)
+    actors = headline(s.get("headline")) + [{"id": "map", "type": "hashmap", "buckets": buckets, "at": [6, 8.35], "size": 8.8}]
+    beats = _op_beats("map", ops, c, ("key", "bucket"), gap=1.4)
+    return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.8], "zoom": 1.0}, {"focus": [6, 8.3], "zoom": 1.04})}
+
+
+VAL = _str(5, "a short value: a number, letter or tiny word")
+_r("ring", "a ring buffer / circular buffer: fixed slots in a circle, writes chase reads and wrap around, overwriting when full",
+   {"headline": _str(40), "slots": {"type": "integer", "minimum": 4, "maximum": 12}, "values": {"type": "array", "maxItems": 12, "items": VAL},
+    "write_label": _str(8), "read_label": _str(8),
+    "ops": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
+        "op": {"enum": ["write", "read"]}, "value": VAL, "cue": CUE}, "required": ["op"]}}},
+   ["slots", "ops"], build_ring,
+   ("A circular buffer has eight slots. New log lines go in one after another, the reader takes the oldest, and when it's full the newest line overwrites the oldest.",
+    {"headline": "A ring of eight slots", "slots": 8, "values": ["A", "B", "C", "D", "E", "F"],
+     "ops": [{"op": "write", "value": "G", "cue": "New log lines"}, {"op": "write", "value": "H"}, {"op": "read", "cue": "takes the oldest"},
+             {"op": "write", "value": "I", "cue": "when it's full"}, {"op": "write", "value": "J", "cue": "newest line overwrites"}]}))
+_r("array", "an array of values with pointers and ranges: binary search, two pointers, sliding window, or sorting steps",
+   {"headline": _str(40), "caption": _str(28, "e.g. 'find 42'"), "values": {"type": "array", "minItems": 3, "maxItems": 9, "items": VAL},
+    "ops": {"type": "array", "minItems": 1, "maxItems": 12, "items": {"type": "object", "properties": {
+        "op": {"enum": ["pointer", "set", "swap", "highlight", "dim", "found"]},
+        "name": _str(5, "pointer name, e.g. lo, mid, hi, i, j"), "index": {"type": "integer", "minimum": 0},
+        "from": {"type": "integer", "minimum": 0}, "to": {"type": "integer", "minimum": 0}, "i": {"type": "integer"}, "j": {"type": "integer"},
+        "value": VAL, "tone": {"enum": TONE}, "cue": CUE}, "required": ["op"]}}},
+   ["values", "ops"], build_array,
+   ("Binary search checks the middle. Forty-two is bigger, so the whole left half is thrown away. Check the middle again, and there it is.",
+    {"headline": "Binary search", "caption": "find 42", "values": ["3", "8", "15", "21", "30", "42", "57", "64", "80"],
+     "ops": [{"op": "pointer", "name": "lo", "index": 0}, {"op": "pointer", "name": "hi", "index": 8},
+             {"op": "pointer", "name": "mid", "index": 4, "cue": "checks the middle"}, {"op": "dim", "from": 0, "to": 4, "cue": "thrown away"},
+             {"op": "pointer", "name": "lo", "index": 5}, {"op": "pointer", "name": "mid", "index": 6, "cue": "middle again"},
+             {"op": "pointer", "name": "mid", "index": 5}, {"op": "found", "index": 5, "cue": "there it is"}]}))
+_r("stack", "a stack (last in, first out: undo, call stack) or a queue (first in, first out: print jobs, task queues)",
+   {"headline": _str(40), "kind": {"enum": ["stack", "queue"]}, "capacity": {"type": "integer", "minimum": 3, "maximum": 7},
+    "values": {"type": "array", "maxItems": 5, "items": _str(6)},
+    "ops": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
+        "op": {"enum": ["push", "pop", "enqueue", "dequeue"]}, "value": _str(6), "cue": CUE}, "required": ["op"]}}},
+   ["kind", "ops"], build_stack,
+   ("Every time you type, the change is pushed onto the undo stack. Press undo, and the last change pops off first.",
+    {"headline": "The undo stack", "kind": "stack", "capacity": 5, "values": ["type H"],
+     "ops": [{"op": "push", "value": "type i", "cue": "Every time you type"}, {"op": "push", "value": "bold"},
+             {"op": "push", "value": "delete", "cue": "pushed onto"}, {"op": "pop", "cue": "Press undo"}, {"op": "pop", "cue": "pops off first"}]}))
+_r("tree", "a binary search tree (or any sorted tree index): inserting or searching by walking down, left if smaller, right if bigger",
+   {"headline": _str(40), "values": {"type": "array", "minItems": 1, "maxItems": 8, "items": _str(4)},
+    "ops": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "object", "properties": {
+        "op": {"enum": ["insert", "search"]}, "value": _str(4), "cue": CUE}, "required": ["op", "value"]}}},
+   ["values", "ops"], build_tree,
+   ("To find thirty-seven, start at the root. It's bigger than fifty? No, go left. Bigger than twenty-five, go right, and there it is. Adding forty just grows a new leaf.",
+    {"headline": "Searching a sorted tree", "values": ["50", "25", "75", "12", "37", "62", "90"],
+     "ops": [{"op": "search", "value": "37", "cue": "start at the root"}, {"op": "insert", "value": "40", "cue": "Adding forty"}]}))
+_r("hashmap", "a hash map / hash table / dictionary: keys hashed into buckets, lookups jump straight to the bucket, collisions chain",
+   {"headline": _str(40), "buckets": {"type": "integer", "minimum": 3, "maximum": 8},
+    "ops": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "object", "properties": {
+        "op": {"enum": ["put", "get"]}, "key": _str(8), "bucket": {"type": "integer", "minimum": 0, "description": "optional: force a bucket to show a collision"},
+        "cue": CUE}, "required": ["op", "key"]}}},
+   ["buckets", "ops"], build_hashmap,
+   ("Each name is hashed to a bucket number. Alice lands in bucket two, Bob in bucket four. Carol also hashes to two, so she's chained right after Alice. Looking up Carol jumps straight to bucket two.",
+    {"headline": "How a hash map finds things", "buckets": 5,
+     "ops": [{"op": "put", "key": "alice", "bucket": 2, "cue": "Alice lands"}, {"op": "put", "key": "bob", "bucket": 4, "cue": "Bob in bucket"},
+             {"op": "put", "key": "carol", "bucket": 2, "cue": "Carol also hashes"}, {"op": "get", "key": "carol", "bucket": 2, "cue": "Looking up Carol"}]}))
+
+
+
 def build_scene(recipe_name: str, slots: dict, narration: str) -> tuple[dict, list[str]]:
     """Recipe + slots → DSL scene (without id/mood/transition). Returns (scene, notes)."""
     r = RECIPES.get(recipe_name) or RECIPES["story"]

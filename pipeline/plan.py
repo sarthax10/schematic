@@ -29,10 +29,13 @@ PROP_HEIGHTS = {k: int(v) for k, v in _keys("props.js", r'^\s{2}("?[\w-]+"?): \{
 ICONS = set(_keys("icons.js", r"^\s{2}(\w+): '()").keys())
 POSES = set(_keys("actors/character.js", r"^\s{2}(\w+): \[()").keys())
 
-ACTOR_TYPES = {"text", "prop", "node", "icon", "shape", "counter", "meter", "bars", "list", "code", "character", "connector"}
+ACTOR_TYPES = {"text", "prop", "node", "icon", "shape", "counter", "meter", "bars", "list", "code", "character", "connector",
+               "ring", "array", "stack", "tree", "hashmap"}
+STRUCTURE_OPS = {"ring": {"write", "read"}, "array": {"pointer", "set", "swap", "highlight", "dim", "found"},
+                 "stack": {"push", "pop", "enqueue", "dequeue"}, "tree": {"insert", "search"}, "hashmap": {"put", "get"}}
 VERBS = {
     "enter", "exit", "move", "scale", "rotate", "pulse", "shake", "hop", "wiggle", "spin", "highlight", "dim", "undim",
-    "label", "say", "emit", "send", "morph", "state", "count", "reveal", "highlight-lines", "flash",
+    "label", "say", "emit", "send", "morph", "state", "count", "reveal", "highlight-lines", "flash", "op",
 }
 ENTER_STYLES = {"pop", "grow", "rise", "drop", "slide-left", "slide-right", "fade", "draw", "words", "type"}
 EXIT_STYLES = {"fade", "pop", "sink", "slide-left", "slide-right"}
@@ -139,7 +142,7 @@ def validate_scene(raw: dict, index: int, prev_ids: set[str]) -> tuple[dict, lis
                 errors.append(f"{where}: actor {aid!r} needs at:[x, y] (grid units) or a layout")
                 continue
             a["at"] = [_num(at[0], -6, 18, 6), _num(at[1], -4, 24, 7.6)]
-            a["size"] = _num(a.get("size", 9 if t in ("text", "list", "code", "bars") else 3), 0.3, 12, 3)
+            a["size"] = _num(a.get("size", 9 if t in ("text", "list", "code", "bars", "ring", "array", "stack", "tree", "hashmap") else 3), 0.3, 12, 3)
         if t == "prop" and a.get("prop") not in PROP_HEIGHTS:
             warnings.append(f"{where}: prop {a.get('prop')!r} unknown → 'box'")
             a["prop"] = "box"
@@ -216,6 +219,12 @@ def validate_scene(raw: dict, index: int, prev_ids: set[str]) -> tuple[dict, lis
             if bad:
                 errors.append(f"{where}: beat {verb!r} references unknown actor(s) {bad}")
                 continue
+            if verb == "op":
+                kind = next((a.get("type") for a in actors if a.get("id") == b.get("actor")), None)
+                if kind not in STRUCTURE_OPS or b.get("op") not in STRUCTURE_OPS[kind]:
+                    errors.append(f"{where}: op {b.get('op')!r} is not valid for actor {b.get('actor')!r} ({kind}); "
+                                  f"valid: {sorted(STRUCTURE_OPS.get(kind, []))}")
+                    continue
             if verb == "enter" and b.get("style") and b["style"] not in ENTER_STYLES:
                 b["style"] = "pop"
             if verb == "exit" and b.get("style") and b["style"] not in EXIT_STYLES:
