@@ -15,12 +15,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import shutil
 import sys
 import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import build, library, render, stages
+from . import build, library, render, review, stages
 from .llm import LLM
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,6 +37,31 @@ def _cached(path: Path, make):
     return out
 
 
+def _save(path: Path, obj) -> None:
+    path.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def accuracy_pass(llm, topic: dict, script: dict, out: Path) -> dict:
+    """Independent accuracy review with up to two revision rounds, each re-checked by a fresh
+    pass. Revisions edit the current script (so a human's edits survive). Whatever is still
+    flagged is recorded in review.json for the human reviewer. Returns the final script."""
+    passes = [stages.review_script(llm, script)]
+    for round_ in range(2):
+        serious = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
+        if not serious:
+            break
+        print(f"  review round {round_ + 1}: {len(serious)} issue(s) flagged; revising the script")
+        fixes = [f"{i.get('quote', '')!r}: {i.get('problem', '')} -> {i.get('fix', '')}" for i in serious]
+        script = stages.write_script(llm, topic, feedback=fixes, current=script)
+        _save(out / "script.json", script)
+        passes.append(stages.review_script(llm, script))
+    remaining = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
+    if remaining:
+        print(f"  {len(remaining)} issue(s) still flagged; left for the human reviewer")
+    _save(out / "review.json", {"passes": passes, "unresolved": remaining})
+    return script
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--topic")
@@ -44,6 +70,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-render", action="store_true", help="stop after the plan passes lint")
     ap.add_argument("--lint-rounds", type=int, default=2)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--auto-approve", action="store_true",
+                    help="skip the human script review (unattended runs; the review step exists for a reason)")
     ap.add_argument("--freeform", action="store_true", help="let the model write raw scene DSL instead of filling recipes (needs a strong model)")
     args = ap.parse_args(argv)
 
@@ -70,36 +98,44 @@ def main(argv=None) -> int:
     print(f"  topic: {topic['topic']}  ->  {out}")
     stages.FAILED_DIR = out / "failed"
 
-    # 2-3. script + independent accuracy review (one revision round if anything serious)
+    # 2-3. script + independent accuracy review
     print("[2/7] writing the script")
     script = _cached(out / "script.json", lambda: stages.write_script(llm, topic))
     print("[3/7] reviewing technical accuracy")
-    review_path = out / "review.json"
-    if review_path.exists():
-        review = json.loads(review_path.read_text(encoding="utf-8"))
-    else:
-        # Up to two revision rounds, each re-checked by a fresh review pass. Anything still
-        # flagged after that is left in review.json for the human reviewer.
-        passes = [stages.review_script(llm, script)]
-        for round_ in range(2):
-            serious = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
-            if not serious:
-                break
-            print(f"  review round {round_ + 1}: {len(serious)} issue(s) flagged; revising the script")
-            fixes = [f"{i.get('quote', '')!r}: {i.get('problem', '')} -> {i.get('fix', '')}" for i in serious]
-            script = stages.write_script(llm, topic, feedback=fixes)
-            (out / "script.json").write_text(json.dumps(script, indent=1, ensure_ascii=False), encoding="utf-8")
-            passes.append(stages.review_script(llm, script))
-        remaining = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
-        review = {"passes": passes, "unresolved": remaining}
-        if remaining:
-            print(f"  {len(remaining)} issue(s) still flagged; left for human review in review.json")
-        review_path.write_text(json.dumps(review, indent=1, ensure_ascii=False), encoding="utf-8")
-    print(f"  {len(stages.script_text(script).split())} words: {script.get('title')}")
+    if not (out / "review.json").exists():
+        script = accuracy_pass(llm, topic, script, out)
 
-    # 4. storyboard
+    # 3b. human review: nothing slow runs until a person approves this exact script
+    status = review.gate(out, script)
+    if status == "changes_requested":
+        notes = review.state(out).get("notes", [])
+        print(f"  revising the script with {len(notes)} reviewer note(s)")
+        script = stages.write_script(llm, topic, feedback=notes, current=script)
+        _save(out / "script.json", script)
+        script = accuracy_pass(llm, topic, script, out)
+        (out / "approval.json").unlink(missing_ok=True)
+        status = "pending"
+    if status != "approved":
+        if args.auto_approve:
+            review.approve(out, by="auto (--auto-approve)")
+        else:
+            library.set_status(slug, "awaiting_review", title=script.get("title", ""), out_dir=str(out))
+            print(f"  {len(stages.script_text(script).split())} words: {script.get('title')}")
+            print(f"  waiting for human review:  python -m pipeline.review {out}")
+            print(f"  then continue with:        python -m pipeline.make --resume {out}")
+            return 0
+    print(f"  approved script, {len(stages.script_text(script).split())} words: {script.get('title')}")
+
+    # 4. storyboard (rebuilt, with its scenes, if the approved script isn't the one it was made from)
     print("[4/7] storyboarding")
-    sb = _cached(out / "storyboard.json", lambda: stages.storyboard(llm, script))
+    sha = review.script_sha(script)
+    sb_path = out / "storyboard.json"
+    made_from = json.loads(sb_path.read_text(encoding="utf-8")).get("script_sha") if sb_path.exists() else None
+    if made_from and made_from != sha:
+        print("  the script changed after this storyboard was made; rebuilding storyboard and scenes")
+        sb_path.unlink()
+        shutil.rmtree(out / "scenes", ignore_errors=True)
+    sb = _cached(sb_path, lambda: {**stages.storyboard(llm, script), "script_sha": sha})
     print(f"  {len(sb['scenes'])} scenes: " + " → ".join(f"{s['id']}({s['mood']})" for s in sb["scenes"]))
 
     # 5. design each scene, in order, each seeing the one before it (continuity, carries)

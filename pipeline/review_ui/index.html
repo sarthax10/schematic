@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Script review</title>
+<style>
+@font-face { font-family: "Bricolage Grotesque"; src: url("/fonts/BricolageGrotesque.woff2") format("woff2"); font-weight: 200 800; }
+@font-face { font-family: "JetBrains Mono"; src: url("/fonts/JetBrainsMono.woff2") format("woff2"); font-weight: 400 700; }
+:root {
+  --ground: #0f1c22; --raised: #16262c; --raised-2: #1c2f36; --edge: #274049;
+  --ink: #e8eff0; --ink-2: #a9bdc2; --muted: #7c939a;
+  --signal: #ffb23e; --ok: #6bdda8; --fail: #ff6f61;
+  --display: "Bricolage Grotesque", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--display); }
+body { min-height: 100vh; }
+button, textarea, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+header { display: flex; align-items: baseline; gap: 16px; padding: 22px 32px 18px; border-bottom: 1px solid var(--edge); }
+header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+header .slug { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.pill { margin-left: auto; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 650; background: var(--raised-2); color: var(--ink-2); }
+.pill.pending, .pill.changes_requested { background: rgba(255, 178, 62, 0.16); color: var(--signal); }
+.pill.approved { background: rgba(107, 221, 168, 0.14); color: var(--ok); }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 40px; padding: 28px 32px 80px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; padding: 20px 16px 64px; } header { padding: 18px 16px; flex-wrap: wrap; } }
+
+/* ---- the script: the thing being reviewed, set for reading ---- */
+.script { max-width: 720px; }
+.title { display: block; width: 100%; resize: none; overflow: hidden; background: none; border: 0; border-bottom: 2px solid transparent; padding: 4px 0 8px; font-size: 34px; font-weight: 760; letter-spacing: -0.025em; line-height: 1.1; }
+.title:hover, .title:focus { border-bottom-color: var(--edge); outline: none; }
+.topic { margin: 6px 0 30px; color: var(--ink-2); font-size: 15px; line-height: 1.5; }
+.sec { position: relative; margin: 0 0 18px; padding: 16px 18px 12px; background: var(--raised); border: 1px solid var(--edge); border-radius: 14px; }
+.sec.flagged { border-color: rgba(255, 178, 62, 0.55); box-shadow: inset 4px 0 0 var(--signal); }
+.sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.part { font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.why { font-size: 13px; color: var(--muted); }
+.count { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sec textarea { display: block; width: 100%; min-height: 60px; resize: none; overflow: hidden; background: none; border: 0; padding: 0; font-size: 19px; line-height: 1.6; color: var(--ink); }
+.sec textarea:focus { outline: none; }
+.sec:focus-within { border-color: var(--ink-2); }
+.flagnote { margin-top: 8px; font-size: 13px; color: var(--signal); line-height: 1.45; }
+
+/* ---- the rail ---- */
+.rail { display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 961px) { .rail { position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow: auto; } }
+.card { background: var(--raised); border: 1px solid var(--edge); border-radius: 14px; padding: 16px 18px; }
+.card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+.card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.dur { margin: 4px 0 10px; font-size: 28px; font-weight: 760; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.dur small { font-size: 14px; font-weight: 550; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+.meter { position: relative; height: 8px; border-radius: 4px; background: var(--raised-2); margin-bottom: 6px; }
+.meter .band { position: absolute; top: 0; bottom: 0; background: rgba(107, 221, 168, 0.28); border-radius: 4px; }
+.meter .mark { position: absolute; top: -4px; width: 4px; height: 16px; border-radius: 2px; background: var(--ink); transform: translateX(-2px); }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+ul.plain { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+ul.plain li { font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+li.err { color: var(--fail); } li.warn { color: var(--signal); }
+.finding { padding: 10px 12px; border-radius: 10px; background: var(--raised-2); }
+.finding.open { box-shadow: inset 3px 0 0 var(--signal); }
+.finding q { display: block; font-size: 13.5px; color: var(--ink); margin-bottom: 4px; }
+.finding .sev { font-size: 12px; font-weight: 700; margin-right: 6px; }
+.sev.high { color: var(--fail); } .sev.medium { color: var(--signal); } .sev.low { color: var(--muted); }
+details summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 10px; }
+table.map { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.map td { padding: 6px 0; border-top: 1px solid var(--edge); color: var(--ink-2); vertical-align: top; }
+table.map td:first-child { color: var(--ink); padding-right: 10px; }
+.claim { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); cursor: pointer; }
+.claim input { margin-top: 3px; accent-color: var(--ok); }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; gap: 8px; }
+.btn { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--edge); background: var(--raised-2); font-weight: 650; font-size: 14px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--ink-2); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.primary { background: var(--ok); border-color: var(--ok); color: #0f2a20; }
+.btn.warn { background: none; border-color: rgba(255, 178, 62, 0.6); color: var(--signal); }
+textarea.notes { width: 100%; min-height: 84px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--edge); background: var(--ground); font-size: 14px; line-height: 1.45; resize: vertical; }
+label.check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); }
+audio { width: 100%; margin-top: 4px; }
+.dirty { font-size: 12.5px; color: var(--signal); min-height: 18px; }
+.done { font-size: 13.5px; line-height: 1.5; color: var(--ok); }
+.done code, .card code { font-family: var(--mono); font-size: 12px; color: var(--ink-2); word-break: break-all; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0; transition: opacity .2s, transform .2s; padding: 10px 16px; border-radius: 10px; background: var(--ink); color: var(--ground); font-size: 14px; font-weight: 600; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Script review</h1><span class="slug" id="slug"></span>
+  <span class="pill" id="pill">Loading</span>
+</header>
+<main class="layout">
+  <section class="script" aria-label="Script">
+    <textarea class="title" id="title" rows="1" aria-label="Video title"></textarea>
+    <p class="topic" id="topic"></p>
+    <div id="sections"></div>
+  </section>
+  <aside class="rail" aria-label="Review">
+    <div class="card">
+      <h2>Length</h2>
+      <div class="dur" id="dur"></div>
+      <div class="meter" aria-hidden="true"><div class="band" id="band"></div><div class="mark" id="mark"></div></div>
+      <div class="scale"><span>30s</span><span>60s</span><span>90s</span><span>120s</span></div>
+      <ul class="plain" id="problems"></ul>
+    </div>
+    <div class="card">
+      <h2>Accuracy pass</h2>
+      <p id="findingsLead"></p>
+      <ul class="plain" id="findings"></ul>
+      <details id="earlierWrap" hidden><summary>Earlier passes</summary><ul class="plain" id="earlier"></ul></details>
+    </div>
+    <div class="card">
+      <h2>Analogy</h2>
+      <table class="map" id="map"></table>
+    </div>
+    <div class="card">
+      <h2>Claims to check</h2>
+      <p>The model can't verify these. Tick each one once you've checked it.</p>
+      <ul class="plain" id="claims"></ul>
+    </div>
+    <div class="card actions">
+      <h2>Decision</h2>
+      <div class="row"><button class="btn" id="listen" type="button">Listen</button><button class="btn" id="save" type="button">Save edits</button></div>
+      <audio id="audio" controls hidden></audio>
+      <div class="dirty" id="dirty" aria-live="polite"></div>
+      <textarea class="notes" id="notes" placeholder="Notes for a revision, one per line. For example: use nginx's access log as the real example instead of 'Linux may use'."></textarea>
+      <button class="btn warn" id="changes" type="button">Request changes</button>
+      <label class="check"><input type="checkbox" id="cont" checked /> Continue the pipeline right away</label>
+      <button class="btn primary" id="approve" type="button">Approve script</button>
+      <div class="done" id="done" aria-live="polite"></div>
+    </div>
+  </aside>
+</main>
+<div id="toast" role="status"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const PART_WHY = { hook: "the problem the viewer has hit", analogy: "the everyday version", reveal: "naming the concept", mechanism: "how it really works", example: "a real system", insight: "what a professional should know", recap: "the idea in one line" };
+const WPS = 2.75;
+let data = null, dirty = false;
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
+function words(s) { return (s.trim().match(/\S+/g) || []).length; }
+function grow(ta) { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json();
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+function currentEdits() {
+  return { title: $("title").value, sections: [...document.querySelectorAll(".sec")].map((el) => ({ part: el.dataset.part, text: el.querySelector("textarea").value })) };
+}
+$("title").addEventListener("input", () => { grow($("title")); setDirty(true); });
+$("title").addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
+function setDirty(v) { dirty = v; $("dirty").textContent = v ? "Unsaved edits" : ""; }
+
+function renderLength() {
+  const total = [...document.querySelectorAll(".sec textarea")].reduce((a, t) => a + words(t.value), 0);
+  const secs = Math.round(total / WPS);
+  $("dur").innerHTML = `${secs}s<small>${total} words</small>`;
+  const pct = (v) => `${((Math.min(Math.max(v, 30), 120) - 30) / 90) * 100}%`;
+  $("band").style.left = pct(60); $("band").style.width = `${(30 / 90) * 100}%`;
+  $("mark").style.left = pct(secs);
+  document.querySelectorAll(".sec").forEach((el) => { el.querySelector(".count").textContent = `${words(el.querySelector("textarea").value)} words`; });
+}
+
+function renderProblems(problems) {
+  const ul = $("problems"); ul.innerHTML = "";
+  for (const p of problems) {
+    const li = document.createElement("li");
+    const soft = p.startsWith("(soft)");
+    li.className = soft ? "warn" : "err";
+    li.textContent = soft ? p.slice(7) : p;
+    ul.appendChild(li);
+  }
+}
+
+function norm(s) { return (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim(); }
+
+function render(p) {
+  const keepScroll = window.scrollY; // re-rendering rebuilds the sections; don't jump the page
+  requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, keepScroll)));
+  data = p;
+  $("slug").textContent = p.slug;
+  const pill = $("pill");
+  const label = { approved: "Approved", pending: "Waiting for review", changes_requested: "Changes requested" }[p.gate] || p.gate;
+  pill.textContent = label; pill.className = `pill ${p.gate}`;
+  document.title = `Review: ${p.script.title}`;
+  $("title").value = p.script.title || "";
+  requestAnimationFrame(() => grow($("title")));
+  const t = p.topic || {};
+  $("topic").textContent = [t.topic, t.angle].filter(Boolean).join(". ");
+
+  const unresolved = p.review.unresolved || [];
+  const box = $("sections"); box.innerHTML = "";
+  for (const s of p.script.sections) {
+    const el = document.createElement("article");
+    el.className = "sec"; el.dataset.part = s.part;
+    const hits = unresolved.filter((f) => f.quote && norm(s.text).includes(norm(f.quote).slice(0, 60)));
+    if (hits.length) el.classList.add("flagged");
+    const partName = s.part[0].toUpperCase() + s.part.slice(1);
+    el.innerHTML = `<div class="sec-head"><span class="part"></span><span class="why"></span><span class="count"></span></div><textarea aria-label=""></textarea>`;
+    el.querySelector(".part").textContent = partName;
+    el.querySelector(".why").textContent = PART_WHY[s.part] || "";
+    const ta = el.querySelector("textarea");
+    ta.value = s.text; ta.setAttribute("aria-label", `${partName} section`);
+    ta.addEventListener("input", () => { grow(ta); renderLength(); setDirty(true); });
+    for (const f of hits) {
+      const n = document.createElement("div");
+      n.className = "flagnote"; n.textContent = `Flagged: ${f.problem}`;
+      el.appendChild(n);
+    }
+    box.appendChild(el);
+    requestAnimationFrame(() => grow(ta));
+  }
+  renderLength();
+  renderProblems(p.problems || []);
+
+  const f = $("findings"); f.innerHTML = "";
+  $("findingsLead").textContent = unresolved.length
+    ? `${unresolved.length} issue${unresolved.length > 1 ? "s" : ""} the automatic revisions didn't resolve. Fix them in the text or in notes.`
+    : "Nothing serious left flagged. That isn't proof it's right; check the claims below.";
+  for (const i of unresolved) f.appendChild(findingEl(i, true));
+  const earlier = (p.review.passes || []).slice(0, -1).flatMap((ps) => ps.issues || []);
+  $("earlierWrap").hidden = !earlier.length;
+  $("earlier").innerHTML = "";
+  for (const i of earlier) $("earlier").appendChild(findingEl(i, false));
+
+  const map = $("map"); map.innerHTML = "";
+  for (const m of (p.script.analogy || {}).mapping || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td></td><td></td>";
+    tr.children[0].textContent = m.everyday; tr.children[1].textContent = m.technical;
+    map.appendChild(tr);
+  }
+  const claims = $("claims"); claims.innerHTML = "";
+  const key = `claims:${p.slug}`;
+  let ticked = {};
+  try { ticked = JSON.parse(localStorage.getItem(key) || "{}"); } catch {}
+  (p.script.claims || []).forEach((c, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<label class="claim"><input type="checkbox" /><span></span></label>`;
+    li.querySelector("span").textContent = c;
+    const cb = li.querySelector("input");
+    cb.checked = !!ticked[c];
+    cb.addEventListener("change", () => { ticked[c] = cb.checked; try { localStorage.setItem(key, JSON.stringify(ticked)); } catch {} });
+    claims.appendChild(li);
+  });
+  setDirty(false);
+}
+
+function findingEl(i, open) {
+  const li = document.createElement("li");
+  li.className = `finding${open ? " open" : ""}`;
+  li.innerHTML = `<q></q><span class="sev"></span><span class="prob"></span>`;
+  li.querySelector("q").textContent = i.quote || "";
+  const sev = li.querySelector(".sev"); sev.textContent = i.severity || ""; sev.classList.add(i.severity || "low");
+  li.querySelector(".prob").textContent = i.problem + (i.fix ? ` Suggested: ${i.fix}` : "");
+  return li;
+}
+
+async function doSave() {
+  try { render(await api("/api/save", currentEdits())); toast("Saved"); } catch (e) { toast(`Save failed: ${e.message}`); }
+}
+$("save").addEventListener("click", doSave);
+document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); doSave(); } });
+
+$("listen").addEventListener("click", async () => {
+  const b = $("listen"); b.disabled = true; b.textContent = "Preparing audio, about 30s";
+  try {
+    if (dirty) render(await api("/api/save", currentEdits()));
+    const { url } = await api("/api/listen", {});
+    const a = $("audio"); a.hidden = false; a.src = url; a.play().catch(() => {});
+  } catch (e) { toast(`Couldn't make audio: ${e.message}`); }
+  b.disabled = false; b.textContent = "Listen";
+});
+
+$("changes").addEventListener("click", async () => {
+  const notes = $("notes").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  if (!notes.length) { toast("Write at least one note first"); $("notes").focus(); return; }
+  try {
+    const p = await api("/api/changes", { ...currentEdits(), notes, continue: $("cont").checked });
+    render(p);
+    $("done").innerHTML = p.continued_log
+      ? `Changes requested. The model is revising now; this page will show the new version when you reload it after the run pauses again.<br><code></code>`
+      : `Changes requested. Run <code>python -m pipeline.make --resume out/${p.slug}</code> to revise.`;
+    if (p.continued_log) $("done").querySelector("code").textContent = p.continued_log;
+  } catch (e) { toast(`Failed: ${e.message}`); }
+});
+
+$("approve").addEventListener("click", async () => {
+  try {
+    const p = await api("/api/approve", { ...currentEdits(), continue: $("cont").checked });
+    render(p);
+    $("done").innerHTML = p.continued_log
+      ? `Approved. The storyboard, scenes and render are running now.<br><code></code>`
+      : `Approved. Run <code>python -m pipeline.make --resume out/${p.slug}</code> to continue.`;
+    if (p.continued_log) $("done").querySelector("code").textContent = p.continued_log;
+  } catch (e) { toast(`Approve failed: ${e.message}`); }
+});
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+api("/api/packet").then(render).catch((e) => { $("pill").textContent = "Couldn't load"; toast(e.message); });
+</script>
+</body>
+</html>

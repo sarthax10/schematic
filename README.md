@@ -14,7 +14,8 @@ designed motion graphics rendered from HTML/CSS/JS, never sourced footage or gen
 ```
 topic ──► library check (never remake a video: keyword + embedding similarity)
       ──► script        design/TEACHING_SCRIPT_SKILL.md  (hook → analogy → reveal → mechanism → example → insight → recap)
-      ──► review        independent accuracy pass; serious issues → one rewrite
+      ──► review        independent accuracy pass; up to two automatic revisions
+      ──► HUMAN REVIEW  the pipeline pauses: a person edits, listens, approves or requests changes
       ──► storyboard    sentences grouped into 6–10 scenes, each with mood, transition, 2–4 shots
       ──► design        one scene at a time in the Scene DSL, guarded by design/SCENE_DESIGN_SKILL.md
       ──► narrate       edge-tts per scene, word-level timestamps
@@ -41,6 +42,12 @@ python -m pipeline.make                          # new topic, end to end
 python -m pipeline.make --category databases
 python -m pipeline.make --topic "how DNS works"  # replaced with a fresh topic if already made
 python -m pipeline.make --resume out/<slug>
+
+# The run pauses after the script. Review it (edit, listen, approve or request changes):
+python -m pipeline.review                        # what's waiting
+python -m pipeline.review out/<slug>             # opens the review page
+# "Approve and continue" on the page resumes the pipeline; or run make --resume yourself.
+# Unattended runs can skip the checkpoint with --auto-approve (not recommended).
 
 # Rendering a plan directly (no LLM needed)
 python -m pipeline.build examples/token_bucket/plan.json            # MP4

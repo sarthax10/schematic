@@ -220,17 +220,33 @@ def check_script(s: dict) -> list[str]:
     return p
 
 
-def write_script(llm: LLM, topic: dict, feedback: list[str] | None = None) -> dict:
+def write_script(llm: LLM, topic: dict, feedback: list[str] | None = None, current: dict | None = None) -> dict:
+    """Writes a new script, or — given `current` and `feedback` — revises that script,
+    keeping everything the notes don't ask to change (a human's edits survive a revision)."""
     system = "You write narration scripts for animated engineering explainers. Reply with JSON only.\n\n" + _read(DESIGN / "TEACHING_SCRIPT_SKILL.md")
-    user = f"""Topic:
+    notes = ("Reviewer corrections you MUST apply:\n" + "\n".join("- " + f for f in feedback)) if feedback else ""
+    if current:
+        user = f"""Topic:
+{json.dumps(topic, ensure_ascii=False, indent=1)}
+
+The current script (same JSON shape you must return):
+{json.dumps({k: current[k] for k in ("title", "sections", "analogy", "real_example", "claims") if k in current}, ensure_ascii=False, indent=1)}
+
+Revise it. Change only what these notes ask for, keep every other sentence as it is, and update
+"claims" to match the revised text.
+{notes}"""
+        temperature = 0.4
+    else:
+        user = f"""Topic:
 {json.dumps(topic, ensure_ascii=False, indent=1)}
 
 A finished script for a different topic, showing the exact JSON shape and the level of plain-spoken teaching expected:
 {_read(EXAMPLE / "script.json")}
 
 Write the script for the topic above. Sections in order: {", ".join(SCRIPT_PARTS)} ("mechanism" may be merged into "reveal" if short).
-{"Reviewer corrections you MUST apply:" + chr(10) + chr(10).join("- " + f for f in feedback) if feedback else ""}"""
-    return _loop(llm, system, user, check_script, label="script", temperature=0.7, fix=fix_script)
+{notes}"""
+        temperature = 0.7
+    return _loop(llm, system, user, check_script, label="script", temperature=temperature, fix=fix_script)
 
 
 # ---- 3. accuracy review ----------------------------------------------------------------------------
