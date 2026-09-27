@@ -468,7 +468,9 @@ def build_reveal(s: dict, c: Cues) -> dict:
                    {"id": f"tech{k}", "type": "node", "icon": icon, "label": (p.get("tech") or "")[:12], "at": [9.2, y], "size": 2.3},
                    {"id": f"map{k}", "type": "connector", "from": f"real{k}", "to": f"tech{k}", "style": "arrow"}]
         cue = c.get(p.get("cue"), (k + 0.4) / (len(pairs) + 0.6))
-        shots_b.append([{"at": cue, "do": "enter", "actor": f"real{k}", "style": "pop"},
+        # The everyday objects are on set from the first frame, waiting to be translated;
+        # each one pulses when named, then its technical counterpart appears.
+        shots_b.append([{"at": cue, "do": "pulse", "actor": f"real{k}"},
                         {"after": 0.25, "do": "enter", "actor": f"map{k}"},
                         {"after": 0.35, "do": "enter", "actor": f"tech{k}", "style": "pop"},
                         {"after": 0.3, "do": "send", "via": f"map{k}", "to": f"tech{k}", "item": "packet", "dur": 0.6}])
