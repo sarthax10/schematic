@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 
 from . import library, plan as plan_mod
@@ -39,21 +40,40 @@ def _log(msg: str) -> None:
     print(f"  {msg}", flush=True)
 
 
+FAILED_DIR: Path | None = None  # set by make.py so failed attempts are kept for diagnosis
+
+
 def _loop(llm: LLM, system: str, user: str, check, *, attempts: int = 3, temperature: float = 0.6,
-          max_tokens: int = 4096, label: str = "stage") -> dict:
-    """Ask, validate with `check(out) -> list[str]` (problems), repair until clean."""
+          max_tokens: int = 4096, label: str = "stage", fix=None) -> dict:
+    """Ask, apply deterministic `fix(out)` (things code can repair better than a model),
+    validate with `check(out) -> list[str]`, and repair until clean."""
     prompt = user
     out, problems = None, []
     for i in range(attempts):
+        started = time.time()
         try:
             out = llm.json(system, prompt, temperature=temperature, max_tokens=max_tokens)
         except LLMError as e:
             problems = [str(e)]
+            _log(f"{label}: attempt {i + 1} failed: {e}")
             continue
+        if fix:
+            out = fix(out)
         problems = check(out)
+        took = time.time() - started
         if not problems:
+            _log(f"{label}: ok on attempt {i + 1} ({took:.0f}s)")
             return out
-        _log(f"{label}: attempt {i + 1} had {len(problems)} problem(s): {problems[0][:140]}")
+        if i == attempts - 1 and all(pr.startswith("(soft)") for pr in problems):
+            # Style issues only: accept rather than throw away a long run; keep them visible.
+            _log(f"{label}: accepted on attempt {i + 1} with {len(problems)} style warning(s)")
+            out["_warnings"] = problems
+            return out
+        _log(f"{label}: attempt {i + 1} ({took:.0f}s) had {len(problems)} problem(s): {problems[0][:160]}")
+        if FAILED_DIR:
+            FAILED_DIR.mkdir(parents=True, exist_ok=True)
+            (FAILED_DIR / f"{re.sub(r'[^a-z0-9]+', '_', label.lower())}_attempt{i + 1}.json").write_text(
+                json.dumps({"problems": problems, "output": out}, indent=1, ensure_ascii=False), encoding="utf-8")
         prompt = (f"{user}\n\nYour previous answer:\n{json.dumps(out, ensure_ascii=False)}\n\n"
                   "It has these problems — fix ALL of them and return the complete corrected JSON:\n- "
                   + "\n- ".join(problems[:12]))
@@ -108,11 +128,63 @@ Reply: {{"candidates": [{{"topic", "category", "angle", "analogy", "real_example
 
 # ---- 2. script ------------------------------------------------------------------------------------
 def split_sentences(text: str) -> list[str]:
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", text.strip()) if s.strip()]
+    # A sentence may end inside a closing quote: "...send me a reply.' If..." splits after the quote.
+    parts = re.split(r"""(?:(?<=[.!?])|(?<=[.!?]['"’”]))\s+(?=[A-Z"'‘“])""", text.strip())
+    return [s.strip() for s in parts if s.strip()]
+
+
+MAX_SENTENCE_WORDS = 26
+_JOINS = [", and ", ", but ", ", so ", "; ", ", which ", ", then ", ", while ", " — "]
+
+
+def split_long(sentence: str) -> list[str]:
+    """Splits an over-long spoken sentence at the clause joint nearest its middle, repeatedly.
+    Deterministic, so a small model never has to be asked twice to shorten a sentence."""
+    words = sentence.split()
+    if len(words) <= MAX_SENTENCE_WORDS:
+        return [sentence]
+    mid = len(sentence) / 2
+    best = None
+    for j in _JOINS:
+        for m in re.finditer(re.escape(j), sentence):
+            if best is None or abs(m.start() - mid) < abs(best[0] - mid):
+                best = (m.start(), j)
+    if best is None:
+        return [sentence]
+    at, j = best
+    left = sentence[:at].rstrip(" ,;—") + "."
+    right = sentence[at + len(j):].strip()
+    if j.strip(", ;—") in ("and", "but", "so", "then", "while"):
+        right = j.strip(", ;—").capitalize() + " " + right
+    elif j.strip(", ;—") == "which":
+        right = "That " + right
+    else:
+        right = right[:1].upper() + right[1:]
+    return split_long(left) + split_long(right)
 
 
 def script_text(script: dict) -> str:
     return " ".join(s["text"].strip() for s in script["sections"])
+
+
+def spoken(text: str) -> str:
+    """Narration is read aloud: turn "SYN (synchronize)" into "SYN, synchronize," and drop other
+    written-only marks, deterministically — no need to spend an LLM round on punctuation."""
+    text = re.sub(r"\s*\(([^()]*)\)", r", \1,", text)
+    text = re.sub(r"\s*\[([^\[\]]*)\]", r", \1,", text)
+    text = text.replace("(", "").replace(")", "").replace("[", "").replace("]", "")
+    text = re.sub(r",\s*([,.!?:;])", r"\1", text)
+    text = re.sub(r"\s+,", ",", text)
+    text = re.sub(r"\s{2,}", " ", text).replace("*", "").replace("`", "")
+    return text.strip()
+
+
+def fix_script(s: dict) -> dict:
+    for sec in s.get("sections") or []:
+        if isinstance(sec, dict) and isinstance(sec.get("text"), str):
+            text = spoken(sec["text"])
+            sec["text"] = " ".join(part for sent in split_sentences(text) for part in split_long(sent))
+    return s
 
 
 def check_script(s: dict) -> list[str]:
@@ -133,13 +205,14 @@ def check_script(s: dict) -> list[str]:
     if n > 245:
         p.append(f"script is {n} words; it must be 160-240. Cut the least essential sentences.")
     for sent in split_sentences(text):
-        if len(sent.split()) > 26:
-            p.append(f"sentence too long for narration ({len(sent.split())} words): {sent[:80]!r}")
+        if len(sent.split()) > MAX_SENTENCE_WORDS:
+            p.append(f"(soft) sentence too long for narration ({len(sent.split())} words): {sent[:80]!r}")
     for b in BANNED:
         if b in text.lower():
-            p.append(f"remove the filler phrase {b!r}")
-    if re.search(r"[()\[\]]", text):
-        p.append("no parentheses or brackets — this is read aloud")
+            p.append(f"(soft) remove the filler phrase {b!r}")
+    for sent in split_sentences(text):
+        if re.search(r"[()\[\]]", sent):
+            p.append(f"no parentheses or brackets — this is read aloud: {sent[:100]!r}")
     if not (s.get("analogy") or {}).get("mapping"):
         p.append("analogy.mapping must map each everyday part to its technical counterpart")
     if not s.get("claims"):
@@ -157,7 +230,7 @@ A finished script for a different topic, showing the exact JSON shape and the le
 
 Write the script for the topic above. Sections in order: {", ".join(SCRIPT_PARTS)} ("mechanism" may be merged into "reveal" if short).
 {"Reviewer corrections you MUST apply:" + chr(10) + chr(10).join("- " + f for f in feedback) if feedback else ""}"""
-    return _loop(llm, system, user, check_script, label="script", temperature=0.7)
+    return _loop(llm, system, user, check_script, label="script", temperature=0.7, fix=fix_script)
 
 
 # ---- 3. accuracy review ----------------------------------------------------------------------------

@@ -35,6 +35,16 @@ mode, how a real system does it).
 
 ## Rules
 
+- The analogy must play out EVERY step of the real mechanism, in the same order and the same
+  number of steps (a three-step protocol gets three letters, not two). Check the mapping
+  one-to-one before writing the reveal.
+- The mechanism section must NOT retell the analogy. Name what the system really does:
+  the actual messages, fields, numbers, states or data structures, in order.
+- The insight must be something a working engineer might not know or might get wrong: a
+  cost (latency, memory, round trips), a failure mode, a tuning knob, or why a newer design
+  exists. "It's important for reliability" is not an insight.
+- The hook names a concrete moment the viewer has lived through (a page that hangs, an error
+  they've seen, a bill that spiked), and the question the video answers.
 - Explain, don't name-drop. Every piece of jargon gets a plain-words definition right away.
 - One analogy for the whole video. Don't mix metaphors.
 - Show-able sentences: each sentence should describe something that can be drawn happening.

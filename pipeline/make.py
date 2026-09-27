@@ -66,7 +66,8 @@ def main(argv=None) -> int:
         out = ROOT / "out" / slug
         out.mkdir(parents=True, exist_ok=True)
         (out / "topic.json").write_text(json.dumps(topic, indent=1, ensure_ascii=False), encoding="utf-8")
-    print(f"  topic: {topic['topic']}  →  {out}")
+    print(f"  topic: {topic['topic']}  ->  {out}")
+    stages.FAILED_DIR = out / "failed"
 
     # 2-3. script + independent accuracy review (one revision round if anything serious)
     print("[2/7] writing the script")
