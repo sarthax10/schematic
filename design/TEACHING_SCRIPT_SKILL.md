@@ -12,7 +12,7 @@ mode, how a real system does it).
 
 ## Length and pace
 
-- 160–240 words (≈ 60–90 seconds spoken). Sentences of 6–18 words. Spoken, not written:
+- 160–250 words (≈ 60–90 seconds spoken). Sentences of 6–18 words. Spoken, not written:
   contractions, second person ("you"), no parentheses, no lists read aloud.
 - Numbers spoken the way a person says them ("five thousand requests an hour", "four
   twenty-nine").

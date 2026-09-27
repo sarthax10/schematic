@@ -78,14 +78,22 @@ def main(argv=None) -> int:
     if review_path.exists():
         review = json.loads(review_path.read_text(encoding="utf-8"))
     else:
-        review = stages.review_script(llm, script)
-        serious = [i for i in review["issues"] if i.get("severity") in ("high", "medium")]
-        if serious:
-            print(f"  {len(serious)} issue(s) flagged; revising the script")
-            fixes = [f"{i.get('quote', '')!r}: {i.get('problem', '')} → {i.get('fix', '')}" for i in serious]
+        # Up to two revision rounds, each re-checked by a fresh review pass. Anything still
+        # flagged after that is left in review.json for the human reviewer.
+        passes = [stages.review_script(llm, script)]
+        for round_ in range(2):
+            serious = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
+            if not serious:
+                break
+            print(f"  review round {round_ + 1}: {len(serious)} issue(s) flagged; revising the script")
+            fixes = [f"{i.get('quote', '')!r}: {i.get('problem', '')} -> {i.get('fix', '')}" for i in serious]
             script = stages.write_script(llm, topic, feedback=fixes)
             (out / "script.json").write_text(json.dumps(script, indent=1, ensure_ascii=False), encoding="utf-8")
-            review = {"first_pass": review, "second_pass": stages.review_script(llm, script)}
+            passes.append(stages.review_script(llm, script))
+        remaining = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
+        review = {"passes": passes, "unresolved": remaining}
+        if remaining:
+            print(f"  {len(remaining)} issue(s) still flagged; left for human review in review.json")
         review_path.write_text(json.dumps(review, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"  {len(stages.script_text(script).split())} words: {script.get('title')}")
 

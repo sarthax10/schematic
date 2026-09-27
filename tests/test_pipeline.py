@@ -39,7 +39,7 @@ def test_reference_scenes_pass_and_match_storyboard():
 def test_script_checker_rejects_short_and_filler():
     bad = {"sections": [{"part": "hook", "text": "Basically, in this video we explain caching."}], "claims": []}
     problems = " ".join(stages.check_script(bad))
-    assert "160-240" in problems and "basically" in problems and "recap" in problems
+    assert "160-250" in problems and "basically" in problems and "recap" in problems
 
 
 def test_storyboard_checker_rejects_gaps_and_monotony():

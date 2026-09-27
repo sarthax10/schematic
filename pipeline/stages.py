@@ -201,9 +201,9 @@ def check_script(s: dict) -> list[str]:
     text = " ".join(x.get("text", "") for x in secs)
     n = len(text.split())
     if n < 160:
-        p.append(f"script is {n} words; it must be 160-240 (60-90 seconds). Expand the analogy and mechanism.")
-    if n > 245:
-        p.append(f"script is {n} words; it must be 160-240. Cut the least essential sentences.")
+        p.append(f"script is {n} words; it must be 160-250 (60-90 seconds). Expand the analogy and mechanism.")
+    if n > 255:
+        p.append(f"script is {n} words; it must be 160-250. Cut the least essential sentences.")
     for sent in split_sentences(text):
         if len(sent.split()) > MAX_SENTENCE_WORDS:
             p.append(f"(soft) sentence too long for narration ({len(sent.split())} words): {sent[:80]!r}")
