@@ -140,6 +140,8 @@ def ground(y: float) -> dict:
 def headline(text: str | None, y: float = 2.85) -> list[dict]:
     if not text:
         return []
+    text = text.strip()
+    text = text[:1].upper() + text[1:]  # sentence case, even when the model writes "tcp handshake"
     return [{"id": "headline", "type": "text", "style": "title", "text": text[:44], "at": [6, y], "size": 10.2, "screen": True}]
 
 

@@ -69,3 +69,21 @@ def test_no_recipe_three_times_running():
     llm = FakeLLM([{"recipe": "flow"}, slots])
     stages.direct_scene(llm, {"title": "T"}, sb, 2, None, ["exchange", "exchange"])
     assert "exchange" not in llm.schemas[0]["properties"]["recipe"]["enum"]
+
+
+def test_code_recipe_rejects_prose_lines():
+    assert stages.check_slots("code", {"lines": ["x-ratelimit-limit: 5000", "GET /users HTTP/1.1"], "highlights": [{"lines": [1], "cue": "a"}]}) == []
+    problems = stages.check_slots("code", {"lines": ["HTTP connections often use this handshake"], "highlights": [{"lines": [1], "cue": "a"}]})
+    assert problems and "not sentences" in problems[0]
+
+
+def test_amber_mood_moves_off_prop_heavy_recipes():
+    narration, slots = recipes.RECIPES["recap"].sample
+    sb = {"scenes": [{"narration": "a"}, {"narration": narration, "mood": "signal"}]}
+    llm = FakeLLM([{"recipe": "recap"}, slots])
+    scene = stages.direct_scene(llm, {"title": "T"}, sb, 1, {"id": "x", "mood": "dusk", "actors": []}, ["hook"])
+    assert scene["mood"] == "night"  # not amber, and not the previous scene's dusk either
+
+
+def test_headlines_are_sentence_case():
+    assert recipes.headline("tcp three-way handshake")[0]["text"] == "Tcp three-way handshake"

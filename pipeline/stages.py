@@ -452,7 +452,18 @@ def check_slots(recipe: str, slots: dict) -> list[str]:
     for key in ("messages", "stages", "pairs", "items", "actions", "lines"):
         if key in slots and not isinstance(slots[key], list):
             p.append(f"{key!r} must be a list")
+    if recipe == "code" and isinstance(slots.get("lines"), list):
+        # Real code/config/headers have syntax; narration sentences dressed up as code don't.
+        prose = [l for l in slots["lines"] if isinstance(l, str) and len(l.split()) >= 4 and not re.search(r"[=:{}()\[\]<>/;#$]", l)]
+        if prose:
+            p.append(f"code lines must be real code, config or protocol headers, not sentences: {prose[0]!r}. "
+                     "If this scene has no real code to show, it should not use the code recipe.")
     return p
+
+
+# The amber 'signal' mood swallows amber props (bulbs, bells, boxes, tickets); keep it for
+# recipes that are mostly nodes, numbers and text.
+SIGNAL_SAFE = {"compare", "stat", "flow", "code"}
 
 
 def _short_fields(schema: dict) -> str:
@@ -518,6 +529,10 @@ def direct_scene(llm: LLM, script: dict, sb: dict, i: int, prev_scene: dict | No
         _log(f"scene {i + 1}: cue repaired {note}")
     scene["id"] = re.sub(r"[^a-z0-9_]+", "_", (s.get("id") or f"s{i + 1}").lower())[:24] or f"s{i + 1}"
     scene["mood"] = s.get("mood") if s.get("mood") in plan_mod.MOODS else "night"
+    if scene["mood"] == "signal" and name not in SIGNAL_SAFE:
+        prev_mood = (prev_scene or {}).get("mood")
+        scene["mood"] = "dusk" if prev_mood != "dusk" else "night"
+        _log(f"scene {i + 1}: {name} on the amber mood would hide its props; using {scene['mood']}")
     tr = dict(s.get("transition") or {"type": "dissolve"}) if i else {"type": "cut"}
     if tr.get("type") in ("zoom-in", "iris"):
         prev_ids = {a["id"] for a in (prev_scene or {}).get("actors", [])}
