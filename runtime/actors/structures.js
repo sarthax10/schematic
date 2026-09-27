@@ -111,9 +111,9 @@ export function ring(spec) {
     const t = to < from ? to + N : to;
     return lerp(from, t, p);
   };
-  const placeTag = (tg, idxF, offset) => {
-    const a = ((-90 + (idxF * 360) / N + offset) * Math.PI) / 180;
-    const r = R + S / 2 + 62;
+  const placeTag = (tg, idxF, outward) => {
+    const a = ((-90 + (idxF * 360) / N) * Math.PI) / 180;
+    const r = R + S / 2 + 62 + outward;
     place(tg.g, C + r * Math.cos(a), C + r * Math.sin(a));
     tg.tri.setAttribute("transform", `rotate(${((a * 180) / Math.PI + 90 + 180).toFixed(1)} 0 0) translate(0 ${-2})`);
   };
@@ -160,8 +160,8 @@ export function ring(spec) {
       const hF = ptrAngle(prev.head, cur.head, k >= 0 ? mv : 1);
       const tF = ptrAngle(prev.tail, cur.tail, k >= 0 ? mv : 1);
       const same = Math.abs(((hF - tF) % N + N) % N) < 0.5;
-      placeTag(wTag, hF, same ? -9 : 0);
-      placeTag(rTag, tF, same ? 9 : 0);
+      placeTag(wTag, hF, 0);
+      placeTag(rTag, tF, same ? 72 : 0); // same slot: the read tag sits one step further out
     },
   };
 }

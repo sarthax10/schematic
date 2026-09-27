@@ -12,7 +12,7 @@ load = lambda name: json.loads((EX / name).read_text(encoding="utf-8"))
 
 
 def test_catalogs_parse_from_runtime():
-    assert {"jar", "bucket", "counter", "server"} <= set(plan_mod.PROP_HEIGHTS)
+    assert {"jar", "bucket", "shop-counter", "server", "printer", "conveyor"} <= set(plan_mod.PROP_HEIGHTS)
     assert {"api", "database", "cache"} <= plan_mod.ICONS
     assert {"idle", "walk", "cheer"} <= plan_mod.POSES
 

@@ -26,6 +26,7 @@ from . import plan as plan_mod
 from .timeline import _norm_tokens
 
 PROPS = sorted(plan_mod.PROP_HEIGHTS)
+CONTAINERS = ["jar", "bucket", "box", "database", "server", "cup", "conveyor"]  # props that visibly hold things
 ICONS = sorted(plan_mod.ICONS)
 SHIRTS = ["sky", "coral", "mint", "amber", "lav", "sand"]
 TONE = ["ok", "fail", "signal", "sky", "lavender"]
@@ -259,7 +260,7 @@ def build_queue(s: dict, c: Cues) -> dict:
     served = max(1, min(count - 1, int(s.get("served") or 3)))
     item = s.get("item") if s.get("item") in plan_mod.PROP_HEIGHTS else "ticket"
     server_prop = s.get("server_prop") if s.get("server_prop") in plan_mod.PROP_HEIGHTS else "bell"
-    actors = [ground(7.9), {"id": "counter", "type": "prop", "prop": "counter", "at": [9.35, 6.2], "size": 3.6, "allowOverlap": ["server", "p0", "p1"]}]
+    actors = [ground(7.9), {"id": "counter", "type": "prop", "prop": "shop-counter", "at": [9.35, 6.2], "size": 3.6, "allowOverlap": ["server", "p0", "p1"]}]
     sh = plan_mod.PROP_HEIGHTS[server_prop] / 200 * 1.6
     actors.append({"id": "server", "type": "prop", "prop": server_prop, "at": [9.45, round(5.46 - sh / 2, 3)], "size": 1.6})
     if s.get("server_label"):
@@ -292,7 +293,7 @@ def build_queue(s: dict, c: Cues) -> dict:
 def build_fill(s: dict, c: Cues) -> dict:
     """A container fills one item at a time until full; the next one overflows."""
     cap = max(2, min(6, int(s.get("capacity") or 4)))
-    container = s.get("container") if s.get("container") in plan_mod.PROP_HEIGHTS else "jar"
+    container = s.get("container") if s.get("container") in CONTAINERS else "jar"
     item = s.get("item") if s.get("item") in plan_mod.PROP_HEIGHTS else "ticket"
     src, si = party("source", s.get("source") or {"kind": "person", "label": ""}, 2.5, 10.0, size=2.5)
     ch = plan_mod.PROP_HEIGHTS[container] / 200 * 3.0
@@ -395,8 +396,8 @@ def build_stat(s: dict, c: Cues) -> dict:
 
 SETTINGS = {  # backdrop props for real-life scenes
     "shop": [{"id": "set0", "type": "prop", "prop": "shop", "at": [6, 5.6], "size": 5.2}],
-    "counter": [{"id": "set0", "type": "prop", "prop": "counter", "at": [6, 9.4], "size": 3.4}],
-    "office": [{"id": "set0", "type": "prop", "prop": "counter", "at": [6, 9.5], "size": 3.2},
+    "counter": [{"id": "set0", "type": "prop", "prop": "shop-counter", "at": [6, 9.4], "size": 3.4}],
+    "office": [{"id": "set0", "type": "prop", "prop": "shop-counter", "at": [6, 9.5], "size": 3.2},
                {"id": "set1", "type": "prop", "prop": "laptop", "at": [6, 8.2], "size": 1.8}],
     "library": [{"id": "set0", "type": "prop", "prop": "shelf", "at": [6, 5.4], "size": 3.4}],
     "street": [{"id": "set0", "type": "prop", "prop": "house", "at": [3.0, 4.6], "size": 2.4},
@@ -594,7 +595,7 @@ _r("queue", "people line up for a limited resource; the first few are served, th
     {"server_prop": "bell", "server_label": "Kitchen", "item": "cup", "people": 7, "served": 3, "arrive_cue": "crowd arrives", "serve_cue": "three meals",
      "wait_cue": "waits their turn", "wait_label": "Busy"}))
 _r("fill", "a container fills up one item at a time until full, then the next one overflows (buffers, caches, memory, limits)",
-   {"headline": _str(40), "source": PARTY, "container": {"enum": PROPS}, "item": {"enum": PROPS}, "capacity": {"type": "integer", "minimum": 2, "maximum": 6},
+   {"headline": _str(40), "source": PARTY, "container": {"enum": CONTAINERS}, "item": {"enum": PROPS}, "capacity": {"type": "integer", "minimum": 2, "maximum": 6},
     "fill_cue": CUE, "full_cue": CUE, "full_label": _str(14), "overflow_cue": CUE, "overflow_label": _str(14)},
    ["container", "item", "fill_cue", "full_cue", "overflow_cue"], build_fill,
    ("Every new message goes into the mailbox. It holds four, and when it's full the next one is simply lost.",
@@ -676,11 +677,23 @@ def build_ring(s: dict, c: Cues) -> dict:
     """A ring buffer: slots in a circle, a write pointer chasing a read pointer; when full,
     the next write overwrites the oldest value."""
     slots = max(4, min(12, int(s.get("slots") or 8)))
+    values = [str(v)[:5] for v in (s.get("values") or [])][:slots]
+    raw_ops = [o for o in (s.get("ops") or [])[:10] if o.get("op") in ("write", "read")]
+    if not values and len(raw_ops) < 4:
+        # A nearly empty ring shows nothing happening; start it partly full so writes,
+        # reads and the wrap-around are all visible within the scene.
+        values = [chr(ord("A") + i) for i in range(max(2, slots // 2))]
+    count, kept = len(values), []
+    for o in raw_ops:
+        if o["op"] == "read" and count == 0:
+            continue  # a read on an empty buffer changes nothing on screen
+        count = max(0, count - 1) if o["op"] == "read" else min(slots, count + 1)
+        kept.append(o)
     actors = headline(s.get("headline")) + [{
-        "id": "ring", "type": "ring", "slots": slots, "values": [str(v)[:5] for v in (s.get("values") or [])][:slots],
+        "id": "ring", "type": "ring", "slots": slots, "values": values,
         "writeLabel": (s.get("write_label") or "write")[:8], "readLabel": (s.get("read_label") or "read")[:8],
         "at": [6, 8.2], "size": 7.4}]
-    ops = [{**o, "value": str(o.get("value", ""))[:5]} for o in (s.get("ops") or [])[:10] if o.get("op") in ("write", "read")]
+    ops = [{**o, "value": str(o.get("value", ""))[:5]} for o in kept]
     beats = _op_beats("ring", ops, c, ("value",))
     return {"actors": actors, "shots": _split_shots(beats, {"focus": [6, 7.7], "zoom": 1.0}, {"focus": [6, 8.0], "zoom": 1.06})}
 

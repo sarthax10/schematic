@@ -55,7 +55,7 @@ export const PROPS = {
       root.querySelector(".steam").style.opacity = String((0.6 + 0.4 * Math.sin(t * 1.7)).toFixed(3));
     },
   },
-  counter: {
+  "shop-counter": {
     h: 92,
     svg: () => `<rect x="4" y="18" width="192" height="74" rx="6" fill="${C.woodD}"/><rect x="0" y="6" width="200" height="18" rx="7" fill="${C.sand}"/><rect x="0" y="20" width="200" height="5" fill="${C.sandD}"/>
       ${[0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<rect x="${14 + i * 22.5}" y="34" width="12" height="50" rx="6" fill="${C.wood}"/>`).join("")}`,
@@ -226,6 +226,29 @@ export const PROPS = {
   pin: {
     h: 240,
     svg: () => `${shadow(100, 236, 30)}<path d="M100 232C60 170 30 130 30 90a70 70 0 0 1 140 0c0 40-30 80-70 142z" fill="${C.coral}"/><circle cx="100" cy="88" r="28" fill="${C.white}"/>`,
+  },
+  printer: {
+    h: 200,
+    svg: () => `${shadow(100, 196, 86)}<rect x="50" y="10" width="100" height="62" rx="6" fill="${C.white}"/>
+      <rect x="16" y="58" width="168" height="98" rx="18" fill="${C.slate}"/><rect x="16" y="58" width="168" height="30" rx="14" fill="${C.slateD}"/>
+      <rect x="38" y="126" width="124" height="14" rx="7" fill="${C.ink}"/>
+      <g class="page"><rect x="52" y="132" width="96" height="58" rx="4" fill="${C.white}"/><rect x="64" y="146" width="56" height="6" rx="3" fill="${C.whiteD}"/><rect x="64" y="160" width="72" height="6" rx="3" fill="${C.whiteD}"/></g>
+      <circle class="led" cx="160" cy="104" r="7" fill="${C.mint}"/>`,
+    tick(t, root) {
+      root.querySelector(".led").style.opacity = Math.sin(t * 6) > -0.3 ? "1" : "0.3";
+      root.querySelector(".page").style.transform = `translateY(${(4 * Math.sin(t * 2.4)).toFixed(2)}px)`;
+    },
+  },
+  conveyor: {
+    h: 120,
+    svg: () => `${shadow(100, 116, 98)}<rect x="30" y="80" width="10" height="34" rx="4" fill="${C.steelD}"/><rect x="160" y="80" width="10" height="34" rx="4" fill="${C.steelD}"/>
+      <rect x="2" y="38" width="196" height="46" rx="23" fill="${C.slateD}"/>
+      <clipPath id="beltclip"><rect x="10" y="38" width="180" height="12" rx="4"/></clipPath>
+      <g clip-path="url(#beltclip)"><g class="belt">${Array.from({ length: 10 }, (_, i) => `<rect x="${i * 24 - 12}" y="38" width="12" height="12" rx="2" fill="${C.steel}"/>`).join("")}</g></g>
+      ${[26, 100, 174].map((x) => `<circle cx="${x}" cy="62" r="13" fill="${C.steel}"/><circle cx="${x}" cy="62" r="4" fill="${C.slateD}"/>`).join("")}`,
+    tick(t, root) {
+      root.querySelector(".belt").setAttribute("transform", `translate(${((t * 36) % 24).toFixed(2)} 0)`);
+    },
   },
   crowd: {
     h: 150,
