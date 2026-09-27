@@ -12,7 +12,7 @@ import re
 import time
 from pathlib import Path
 
-from . import library, plan as plan_mod
+from . import library, plan as plan_mod, recipes
 from .llm import LLM, LLMError
 from .timeline import _norm_tokens
 
@@ -44,7 +44,7 @@ FAILED_DIR: Path | None = None  # set by make.py so failed attempts are kept for
 
 
 def _loop(llm: LLM, system: str, user: str, check, *, attempts: int = 3, temperature: float = 0.6,
-          max_tokens: int = 4096, label: str = "stage", fix=None) -> dict:
+          max_tokens: int = 4096, label: str = "stage", fix=None, schema: dict | None = None) -> dict:
     """Ask, apply deterministic `fix(out)` (things code can repair better than a model),
     validate with `check(out) -> list[str]`, and repair until clean."""
     prompt = user
@@ -52,7 +52,7 @@ def _loop(llm: LLM, system: str, user: str, check, *, attempts: int = 3, tempera
     for i in range(attempts):
         started = time.time()
         try:
-            out = llm.json(system, prompt, temperature=temperature, max_tokens=max_tokens)
+            out = llm.json(system, prompt, schema=schema, temperature=temperature, max_tokens=max_tokens)
         except LLMError as e:
             problems = [str(e)]
             _log(f"{label}: attempt {i + 1} failed: {e}")
@@ -363,7 +363,7 @@ def check_scene(scene: dict, sb_scene: dict, index: int, prev_ids: set[str], las
         if not s.get("at"):
             p.append("every shot after the first needs an 'at' phrase saying when the camera moves")
     texts = [a for a in scene.get("actors", []) if a.get("type") == "text"]
-    if len(texts) > 3:
+    if len(texts) > 3 and not scene.get("recipe"):  # recipes use deliberate, length-capped labels
         p.append(f"{len(texts)} text actors; max 3 per scene — the captions already carry the narration")
     if len(scene.get("actors", [])) > 12:
         p.append("more than 12 actors; simplify")
@@ -429,3 +429,101 @@ def describe_lint(issue: dict, scene_start: float) -> str:
     if k == "empty_frame":
         return f"at {t}s the frame is empty — something should be on screen for the whole scene"
     return json.dumps(issue)
+
+
+
+# ---- 5b. scene direction with recipes (default) ------------------------------------------------------
+DIRECTOR = ("You direct scenes of an animated vertical explainer video for software engineers and beginners. "
+            "Each scene is built from a proven recipe; you choose the recipe and fill its form. Reply with JSON only.")
+
+
+def _main_actor(scene: dict) -> str | None:
+    for a in scene.get("actors", []):
+        if a.get("type") not in ("shape", "text", "connector") and not a.get("screen"):
+            return a["id"]
+    return None
+
+
+def check_slots(recipe: str, slots: dict) -> list[str]:
+    p = []
+    for req in recipes.RECIPES[recipe].schema.get("required", []):
+        if slots.get(req) in (None, "", [], {}):
+            p.append(f"field {req!r} is required for recipe {recipe!r}")
+    for key in ("messages", "stages", "pairs", "items", "actions", "lines"):
+        if key in slots and not isinstance(slots[key], list):
+            p.append(f"{key!r} must be a list")
+    return p
+
+
+def _short_fields(schema: dict) -> str:
+    """The form's fields for the prompt, with long catalogue enums elided (the structured
+    output schema still enforces them)."""
+    fields = json.dumps(schema["properties"], ensure_ascii=False)
+    return re.sub(r'\{"enum": \[[^\]]{200,}\]', '{"enum": [...catalogue...]', fields)
+
+
+def direct_scene(llm: LLM, script: dict, sb: dict, i: int, prev_scene: dict | None, recent: list[str],
+                 notes: list[str] | None = None) -> dict:
+    """Choose a recipe for storyboard scene i and fill its form (two small structured calls)."""
+    s = sb["scenes"][i]
+    n = len(sb["scenes"])
+    names = list(recipes.RECIPES)
+    if len(recent) >= 2 and recent[-1] == recent[-2] and recent[-1] in names:
+        names.remove(recent[-1])  # never the same recipe three scenes running
+    if i == 0:
+        hint = " This is the OPENING scene: 'hook' is usually right."
+    elif i == n - 1:
+        hint = " This is the LAST scene: 'recap' is usually right."
+    else:
+        hint = ""
+    mapping = json.dumps(script.get("analogy", {}).get("mapping", []), ensure_ascii=False)
+    context = "\n".join([
+        f"Video: {script.get('title')}",
+        f"Analogy mapping: {mapping}",
+        f"Scene {i + 1} of {n}. Purpose: {s.get('purpose')}. Planned visual: {s.get('visual')}",
+        f'Narration of this scene: "{s["narration"]}"',
+    ])
+    choose_schema = {"type": "object", "properties": {"recipe": {"enum": names}, "why": {"type": "string", "maxLength": 160}},
+                     "required": ["recipe"]}
+    choose_prompt = "\n".join([
+        context, "", "Recipes:", recipes.menu(), "",
+        f"Previous scenes used: {recent[-3:] or 'none'}.{hint}",
+        "Pick the recipe whose on-screen ACTION best shows what this narration says.",
+        f'Reply: {{"recipe": one of {names}, "why": "one short sentence"}}',
+    ])
+    choice = llm.json(DIRECTOR, choose_prompt, schema=choose_schema, temperature=0.3)
+    name = choice.get("recipe") if choice.get("recipe") in names else names[0]
+    r = recipes.RECIPES[name]
+    rules = [
+        '- Every "cue" field: 2-4 consecutive words copied EXACTLY from the narration above, in the order they are spoken.',
+        "- Labels are short (a few words), sentence case, and name things from this topic, not from any other example.",
+        '- Use people (kind "person") for real-life analogy roles, devices (kind "device") for technical systems.',
+        "- Pick props and icons a viewer would instantly recognise as the thing being described.",
+    ]
+    if notes:
+        rules.append("Fix these problems found in the rendered frames:")
+        rules += [f"- {x}" for x in notes]
+    fill_prompt = "\n".join([
+        context, "",
+        f"Recipe: {name} - {r.use_when}",
+        f"Form fields: {_short_fields(r.schema)}", "",
+        "Fill the form for THIS scene of THIS video:",
+        *rules,
+        "Reply with the filled form as JSON.",
+    ])
+    slots = _loop(llm, DIRECTOR, fill_prompt, lambda o: check_slots(name, o), schema=r.schema,
+                  label=f"scene {i + 1} ({name})", temperature=0.4, max_tokens=1500)
+    scene, repaired = recipes.build_scene(name, slots, s["narration"])
+    for note in repaired:
+        _log(f"scene {i + 1}: cue repaired {note}")
+    scene["id"] = re.sub(r"[^a-z0-9_]+", "_", (s.get("id") or f"s{i + 1}").lower())[:24] or f"s{i + 1}"
+    scene["mood"] = s.get("mood") if s.get("mood") in plan_mod.MOODS else "night"
+    tr = dict(s.get("transition") or {"type": "dissolve"}) if i else {"type": "cut"}
+    if tr.get("type") in ("zoom-in", "iris"):
+        prev_ids = {a["id"] for a in (prev_scene or {}).get("actors", [])}
+        if tr.get("actor") not in prev_ids:
+            tr["actor"] = _main_actor(prev_scene or {})
+    scene["transition"] = tr
+    scene["slots"] = slots
+    scene["why"] = choice.get("why", "")
+    return scene

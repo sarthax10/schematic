@@ -174,8 +174,11 @@ function lint(t) {
     const bg = A.spec.type === "shape";
     const box = { id: A.spec.id, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom, bg };
     // Text, screen-layer actors and the camera's subject must sit fully in the safe area.
-    // Other world actors may be cropped by a close-up — that's framing, not a mistake.
-    const strict = A.spec.type === "text" || A.spec.type === "counter" || A.spec.screen || A.spec.id === focusId || cam.zoom < 1.15;
+    // Other world actors may be cropped by a close-up â€” that's framing, not a mistake.
+    const owner = A.spec.attached && S.actors.get(A.spec.attached);
+    const strict = owner
+      ? owner.spec.id === focusId || cam.zoom < 1.15 // a name label crops together with its owner
+      : A.spec.type === "text" || A.spec.type === "counter" || A.spec.screen || A.spec.id === focusId || cam.zoom < 1.15;
     if (!bg && strict) {
       const off = Math.max(SAFE.x0 - r.left, r.right - SAFE.x1, SAFE.y0 - r.top, r.bottom - SAFE.y1);
       if (off > 24) issues.push({ scene: S.scene.id, t, kind: "outside_safe_area", actor: A.spec.id, px: Math.round(off) });

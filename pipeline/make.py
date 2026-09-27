@@ -44,6 +44,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-render", action="store_true", help="stop after the plan passes lint")
     ap.add_argument("--lint-rounds", type=int, default=2)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--freeform", action="store_true", help="let the model write raw scene DSL instead of filling recipes (needs a strong model)")
     args = ap.parse_args(argv)
 
     llm = LLM()
@@ -96,11 +97,16 @@ def main(argv=None) -> int:
     # 5. design each scene, in order, each seeing the one before it (continuity, carries)
     print("[5/7] designing scenes")
     scenes = []
+    def direct(i, prev, notes=None, current=None):
+        if args.freeform:
+            return stages.design_scene(llm, script, sb, i, prev, lint_notes=notes, current=current)
+        return stages.direct_scene(llm, script, sb, i, prev, [x.get("recipe", "") for x in scenes[:i]], notes=notes)
+
     for i in range(len(sb["scenes"])):
         prev = scenes[-1] if scenes else None
-        sc = _cached(out / "scenes" / f"{i:02d}.json", lambda i=i, prev=prev: stages.design_scene(llm, script, sb, i, prev))
+        sc = _cached(out / "scenes" / f"{i:02d}.json", lambda i=i, prev=prev: direct(i, prev))
         scenes.append(sc)
-        print(f"  scene {i + 1}: {len(sc.get('actors', []))} actors, {len(sc.get('shots', []))} shots")
+        print(f"  scene {i + 1}: {sc.get('recipe', 'freeform')}, {len(sc.get('actors', []))} actors, {len(sc.get('shots', []))} shots")
 
     def save_plan():
         plan = {"title": script.get("title"), "topic": topic["topic"], "scenes": scenes}
@@ -125,8 +131,7 @@ def main(argv=None) -> int:
             break
         for i, sc in enumerate(scenes):
             if sc["id"] in by_scene:
-                scenes[i] = stages.design_scene(llm, script, sb, i, scenes[i - 1] if i else None,
-                                                lint_notes=by_scene[sc["id"]], current=sc)
+                scenes[i] = direct(i, scenes[i - 1] if i else None, notes=by_scene[sc["id"]], current=sc)
                 (out / "scenes" / f"{i:02d}.json").write_text(json.dumps(scenes[i], indent=1, ensure_ascii=False), encoding="utf-8")
 
     if args.no_render:
