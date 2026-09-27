@@ -45,6 +45,10 @@ def accuracy_pass(llm, topic: dict, script: dict, out: Path) -> dict:
     """Independent accuracy review with up to two revision rounds, each re-checked by a fresh
     pass. Revisions edit the current script (so a human's edits survive). Whatever is still
     flagged is recorded in review.json for the human reviewer. Returns the final script."""
+    # Human reviewer notes outrank the automatic accuracy pass: every automatic revision must
+    # keep them, or a later round can quietly undo what a person asked for.
+    human = json.loads((out / "human_notes.json").read_text(encoding="utf-8")) if (out / "human_notes.json").exists() else []
+    keep = [f"Keep this change a human reviewer asked for: {n}" for n in human]
     passes = [stages.review_script(llm, script)]
     for round_ in range(2):
         serious = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
@@ -52,7 +56,7 @@ def accuracy_pass(llm, topic: dict, script: dict, out: Path) -> dict:
             break
         print(f"  review round {round_ + 1}: {len(serious)} issue(s) flagged; revising the script")
         fixes = [f"{i.get('quote', '')!r}: {i.get('problem', '')} -> {i.get('fix', '')}" for i in serious]
-        script = stages.write_script(llm, topic, feedback=fixes, current=script)
+        script = stages.write_script(llm, topic, feedback=fixes + keep, current=script)
         _save(out / "script.json", script)
         passes.append(stages.review_script(llm, script))
     remaining = [i for i in passes[-1]["issues"] if i.get("severity") in ("high", "medium")]
@@ -109,6 +113,8 @@ def main(argv=None) -> int:
     status = review.gate(out, script)
     if status == "changes_requested":
         notes = review.state(out).get("notes", [])
+        history = json.loads((out / "human_notes.json").read_text(encoding="utf-8")) if (out / "human_notes.json").exists() else []
+        _save(out / "human_notes.json", history + [n for n in notes if n not in history])
         print(f"  revising the script with {len(notes)} reviewer note(s)")
         script = stages.write_script(llm, topic, feedback=notes, current=script)
         _save(out / "script.json", script)
